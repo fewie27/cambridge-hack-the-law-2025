@@ -4,11 +4,14 @@ import '../api/lib/my_flutter_api_client.dart';
 import 'package:counterclaimer/api/lib/src/model/add_case_request.dart';
 import 'package:counterclaimer/api/lib/src/model/analysis_response.dart';
 
+
 class ApiService {
   late final MyFlutterApiClient _apiClient;
 
-  ApiService() {
-    _apiClient = MyFlutterApiClient();
+  ApiService({String? baseUrl}) {
+    _apiClient = MyFlutterApiClient(
+      basePathOverride: baseUrl ?? 'http://172.25.43.81:8000', // Change this URL
+    );
   }
 
   /// Calls the addCase endpoint with the provided user prompt

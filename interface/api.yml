@@ -23,18 +23,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "healthy"
-                  timestamp:
-                    type: string
-                    format: date-time
-                    example: "2024-01-01T12:00:00Z"
-                  version:
-                    type: string
-                    example: "1.0.0"
+                $ref: '#/components/schemas/HealthResponse'
         '500':
           description: Internal server error
           content:
@@ -144,6 +133,20 @@ components:
           type: string
           description: Reference to the case file
           example: "doc_12345.pdf"
+    
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2024-01-01T12:00:00Z"
+        version:
+          type: string
+          example: "1.0.0"
     
     Error:
       type: object

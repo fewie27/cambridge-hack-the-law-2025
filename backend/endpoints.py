@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import datetime, date
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 # Import generated models
-from models import HealthResponse, Argument, RelatedCase, AnalysisResponse, AddCaseRequest
+from models import HealthResponse, Argument, CaseReference, AnalysisResponse, AddCaseRequest
 
 # Import embedding service
 from services.embedding_service import EmbeddingService
@@ -24,40 +24,82 @@ async def add_case(request: AddCaseRequest):
         raise HTTPException(status_code=400, detail="User prompt too long (max 1000 characters)")
     
     try:
-        # Search for similar cases using the user prompt
-        similar_cases = embedding_service.search_similar_cases(request.user_prompt, top_k=10)
+        # Generate a case ID based on timestamp and hash of prompt
+        import hashlib
+        import uuid
+        case_id = f"CASE-{uuid.uuid4().hex[:8].upper()}"
         
-        # Group cases by argument type
-        argument_groups = {}
+        # For now, return sample data until embedding service is fully implemented
+        # In production, this would use: embedding_service.search_similar_cases(request.user_prompt, top_k=10)
         
-        for case in similar_cases:
-            argument = case["metadata"]["argument"]
-            if argument not in argument_groups:
-                argument_groups[argument] = []
-            
-            # Create RelatedCase object
-            related_case = RelatedCase(
-                caseIdentifier=case["metadata"]["case_id"],
-                status=case["metadata"]["status"],
-                matching=case["matching"]
+        # Sample strengths
+        strengths = [
+            Argument(
+                argument="Strong precedent for employment discrimination claims",
+                case_references=[
+                    CaseReference(
+                        caseIdentifier="CASE-2023-001",
+                        title="Smith v. ABC Corporation",
+                        Date=date(2023, 3, 15),
+                        matchingDegree=0.92,
+                        fileReference="employment_discrimination_2023_001.pdf"
+                    ),
+                    CaseReference(
+                        caseIdentifier="CASE-2022-045",
+                        title="Johnson v. XYZ Industries",
+                        Date=date(2022, 11, 8),
+                        matchingDegree=0.87,
+                        fileReference="wrongful_termination_2022_045.pdf"
+                    )
+                ]
+            ),
+            Argument(
+                argument="Clear violation of employment contract terms",
+                case_references=[
+                    CaseReference(
+                        caseIdentifier="CASE-2023-012",
+                        title="Brown v. Tech Solutions Ltd",
+                        Date=date(2023, 1, 22),
+                        matchingDegree=0.85,
+                        fileReference="contract_violation_2023_012.pdf"
+                    )
+                ]
             )
-            
-            argument_groups[argument].append(related_case)
+        ]
         
-        # Create Argument objects from grouped cases
-        arguments = []
-        for argument_text, related_cases in argument_groups.items():
-            argument_obj = Argument(
-                argument=argument_text,
-                relatedCases=related_cases
+        # Sample weaknesses
+        weaknesses = [
+            Argument(
+                argument="At-will employment may limit claims",
+                case_references=[
+                    CaseReference(
+                        caseIdentifier="CASE-2023-007",
+                        title="Davis v. Global Corp",
+                        Date=date(2023, 2, 10),
+                        matchingDegree=0.78,
+                        fileReference="at_will_employment_2023_007.pdf"
+                    )
+                ]
+            ),
+            Argument(
+                argument="Insufficient documentation of discriminatory behavior",
+                case_references=[
+                    CaseReference(
+                        caseIdentifier="CASE-2022-089",
+                        title="Wilson v. Manufacturing Inc",
+                        Date=None,  # Some cases might not have dates
+                        matchingDegree=0.72,
+                        fileReference="documentation_issues_2022_089.pdf"
+                    )
+                ]
             )
-            arguments.append(argument_obj)
+        ]
         
-        # If no similar cases found, return empty response
-        if not arguments:
-            return AnalysisResponse(arguments=[])
-        
-        return AnalysisResponse(arguments=arguments)
+        return AnalysisResponse(
+            caseId=case_id,
+            strengths=strengths,
+            weaknesses=weaknesses
+        )
         
     except Exception as e:
         print(f"Error in add_case: {e}")

@@ -1,5 +1,10 @@
 from datetime import datetime
 from fastapi import APIRouter
+import sys
+from pathlib import Path
+
+# Add generated models to path
+sys.path.append(str(Path("generated")))
 from models import HealthResponse
 
 # Create router for health endpoints
