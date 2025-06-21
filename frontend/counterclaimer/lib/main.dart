@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:counterclaimer/core/theme/app_theme.dart';
 import 'package:counterclaimer/features/app_shell.dart';
 // import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:counterclaimer/core/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,9 @@ void main() async {
   // Load environment variables
   // await dotenv.load(fileName: ".env");
   
+ApiService apiService = ApiService();
+apiService.addCase("test");
+
   runApp(const ProviderScope(child: CounterclaimerApp()));
 }
 
