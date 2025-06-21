@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:counterclaimer/core/theme/app_theme.dart';
 import 'package:counterclaimer/features/app_shell.dart';
 import 'package:counterclaimer/core/simple_api.dart';
+import 'package:counterclaimer/features/chatbot/screens/animated_welcome_screen.dart';
+// import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:counterclaimer/core/api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +39,13 @@ class CounterclaimerApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light, // Default to light mode
-      home: const AppShell(),
+      
+      // ⭐ CAMBIA QUESTA RIGA ⭐
+      // DA: home: const AppShell(),
+      // A:
+      home: const AnimatedWelcomeScreen(
+        appContent: AppShell(),
+      ),
     );
   }
 }
