@@ -1,6 +1,9 @@
 from datetime import datetime, date
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+import re
+import html
+import unicodedata
 
 # Import generated models
 from models import Argument, CaseReference, AnalysisResponse, AddCaseRequest, GenDraftRequest, GenDraftResponse
@@ -13,6 +16,51 @@ api_router = APIRouter(prefix="/api/v1", tags=["API"])
 
 # Initialize embedding service
 embedding_service = EmbeddingService()
+
+def sanitize_text(text: str) -> str:
+    """
+    Sanitizes text by removing or replacing problematic characters and sequences.
+    
+    Args:
+        text: The input text to sanitize
+        
+    Returns:
+        Cleaned text safe for JSON serialization and display
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    
+    # Decode HTML entities
+    text = html.unescape(text)
+    
+    # Normalize unicode characters
+    text = unicodedata.normalize('NFKC', text)
+    
+    # Remove or replace problematic characters
+    # Remove null bytes and other control characters except newlines and tabs
+    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+    
+    # Replace multiple spaces with single space
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Remove leading/trailing whitespace
+    text = text.strip()
+    
+    # Replace problematic unicode characters that might cause issues
+    # Replace various quote types with standard quotes
+    text = text.replace('"', '"').replace('"', '"')
+    text = text.replace(''', "'").replace(''', "'")
+    text = text.replace('–', '-').replace('—', '-')
+    text = text.replace('…', '...')
+    
+    # Remove any remaining non-printable characters
+    text = ''.join(char for char in text if char.isprintable() or char in '\n\t')
+    
+    # Ensure the text is not too long (prevent memory issues)
+    if len(text) > 10000:
+        text = text[:10000] + "..."
+    
+    return text
 
 @api_router.post("/add_case", response_model=AnalysisResponse)
 async def add_case(request: AddCaseRequest):
@@ -55,14 +103,16 @@ async def add_case(request: AddCaseRequest):
                 case_refs = []
                 for ref_data in item.get("case_references", []):
                     meta = ref_data.get("metadata", {})
-                    case_identifier = meta.get("Identifier") or meta.get("case_id") or meta.get("source_file") or "N/A"
-                    title = meta.get("Title") or meta.get("title") or meta.get("source_file") or "Unknown Title"
+                    case_identifier = sanitize_text(meta.get("Identifier") or meta.get("case_id") or meta.get("source_file") or "N/A")
+                    title = sanitize_text(meta.get("Title") or meta.get("title") or meta.get("source_file") or "Unknown Title")
                     decision_date = meta.get("DecisionDate") or meta.get("date")
-                    sourcefile_raw_md = meta.get("source_file") or meta.get("file_path") or "N/A"
+                    sourcefile_raw_md = sanitize_text(meta.get("source_file") or meta.get("file_path") or "N/A")
                     parsed_date = None
                     if decision_date:
                         try:
-                            parsed_date = date.fromisoformat(decision_date[:10])
+                            # Sanitize the date string before parsing
+                            clean_date = sanitize_text(decision_date)
+                            parsed_date = date.fromisoformat(clean_date[:10])
                         except Exception:
                             parsed_date = None
                     case_refs.append(CaseReference(
@@ -73,7 +123,7 @@ async def add_case(request: AddCaseRequest):
                         sourcefile_raw_md=sourcefile_raw_md
                     ))
                 output_args.append(Argument(
-                    argument=item.get("argument", "No argument provided."),
+                    argument=sanitize_text(item.get("argument", "No argument provided.")),
                     case_references=case_refs
                 ))
             return output_args
@@ -174,15 +224,16 @@ async def gen_draft(case_id: str):
             
         # TODO: Implement actual draft generation logic
         # For now, return a dummy response with the case_id included
+        sanitized_case_id = sanitize_text(case_id)
         return GenDraftResponse(
-            text=html_template.format(
-                claimants=f"Claimants (Case: {case_id})",
+            text=sanitize_text(html_template.format(
+                claimants=f"Claimants (Case: {sanitized_case_id})",
                 respondents="Respondents",
                 title="Title",
                 intro_statement="Intro Statement",
                 body="Body",
                 date=date.today().strftime("%d %B %Y")
-            )
+            ))
         )
     except Exception as e:
         print(f"Error in gen_draft: {e}")
