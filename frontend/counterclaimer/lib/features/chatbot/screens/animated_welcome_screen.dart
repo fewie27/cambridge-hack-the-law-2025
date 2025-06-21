@@ -848,58 +848,26 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
   }
 
   Widget _buildTopBar(BuildContext context) {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: AppColors.backgroundLight,
-      ),
-      child: Row(
-        children: [
-          Image.asset(
-            'assets/images/ius_mundi_logo.png',
-            width: 32,
-            height: 32,
-            fit: BoxFit.contain,
-          ),
-          Image.asset(
-            'assets/images/codex_logo.jpeg',
-            width: 32,
-            height: 32,
-            fit: BoxFit.contain,
-          ),
-          const SizedBox(width: 16),
-          const Text(
-            'ARIA',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF000000),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: const Color(0xFF678D7F),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Center(
-              child: Text(
-                'MK',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  return Container(
+    height: 64,
+    padding: const EdgeInsets.symmetric(horizontal: 24),
+    decoration: const BoxDecoration(
+      color: AppColors.backgroundLight,
+    ),
+    child: Row(
+      children: [
+        Image.asset(
+          'assets/images/aria_logo.jpg',
+          width: 120,
+          height: 120,
+          fit: BoxFit.contain,
+        ),
+        const SizedBox(width: 16),
+        const Spacer(),
+      ],
+    ),
+  );
+}
 
   Widget _buildMainInput(BuildContext context) {
     return Container(
@@ -920,14 +888,6 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
                 color: Color(0xFFAAAAAA),
                 size: 20,
               ),
-            ),
-          ),
-          IconButton(
-            onPressed: () => _handleMenu(),
-            icon: const Icon(
-              Icons.tune,
-              color: Color(0xFFAAAAAA),
-              size: 20,
             ),
           ),
           Expanded(

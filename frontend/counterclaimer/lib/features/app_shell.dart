@@ -132,44 +132,15 @@ class _TopBar extends StatelessWidget {
         ],
       ),
       child: Row(
-        children: [
-          // BMW Logo
-          Image.asset(
-            'assets/images/ius_mundi_logo.png',
-            width: isMobile ? 40 : 30,
-            height: isMobile ? 40 : 30,
-          ),
-          
-          // Only show additional logos on larger screens
-          if (!isSmallScreen) ...[
-            const SizedBox(width: 16),
-            // Mini Logo
-            Image.asset(
-              'assets/images/codex_logo.jpeg',
-              width: 40,
-              height: 40,
-            ),
-            const SizedBox(width: 16),
-          ],
-          
-          // Title
-          const SizedBox(width: 24),
-          Expanded(
-            child: Text(
-              isSmallScreen ? 'Counterclaimer' : 'Counterclaimer',
-              style: TextStyle(
-                fontSize: isMobile ? 20 : 18,  // Font size aumentato su mobile
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          
-          // User Avatar on the right
-          _UserAvatar(),
-        ],
-      ),
+  children: [
+    // ARIA Logo only
+    Image.asset(
+      'assets/images/aria_logo.jpg',
+      width: 120,
+      height: 120,
+    ),
+  ],
+),
     );
   }
 }
