@@ -1,7 +1,8 @@
+import 'package:counterclaimer/api/lib/src/api.dart';
 import 'package:dio/dio.dart';
 import '../api/lib/my_flutter_api_client.dart';
-import '../api/lib/src/model/add_case_request.dart';
-import '../api/lib/src/model/analysis_response.dart';
+import 'package:counterclaimer/api/lib/src/model/add_case_request.dart';
+import 'package:counterclaimer/api/lib/src/model/analysis_response.dart';
 
 class ApiService {
   late final MyFlutterApiClient _apiClient;

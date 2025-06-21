@@ -18,16 +18,16 @@ void main() async {
   // Load environment variables
   // await dotenv.load(fileName: ".env");
   
-  runApp(const ProviderScope(child: BMWLegalApp()));
+  runApp(const ProviderScope(child: CounterclaimerApp()));
 }
 
-class BMWLegalApp extends ConsumerWidget {
-  const BMWLegalApp({super.key});
+class CounterclaimerApp extends ConsumerWidget {
+  const CounterclaimerApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: 'BMW Legal Assistant',
+      title: 'Counterclaimer Assistant',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
