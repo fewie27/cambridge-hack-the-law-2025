@@ -172,6 +172,32 @@ final weaknessesProvider = Provider<List<LegalArgument>>((ref) {
   );
 });
 
+final totalCasesProvider = Provider<int>((ref) {
+  final strengths = ref.watch(strengthsProvider);
+  final weaknesses = ref.watch(weaknessesProvider);
+
+  final allCitations = <String>{}; // Use a Set of citations to count unique cases
+
+  for (var arg in strengths) {
+    for (var precedent in arg.precedentCases) {
+      if (precedent.citation.isNotEmpty) {
+        allCitations.add(precedent.citation);
+      }
+    }
+  }
+  for (var arg in weaknesses) {
+    for (var precedent in arg.precedentCases) {
+      if (precedent.citation.isNotEmpty) {
+        allCitations.add(precedent.citation);
+      }
+    }
+  }
+  
+  // A single argument can have multiple cases, and a single case can support multiple arguments.
+  // The goal is to count unique precedent cases across all arguments.
+  return allCitations.length;
+});
+
 class LegalArgumentsScreen extends ConsumerWidget {
   const LegalArgumentsScreen({super.key});
 

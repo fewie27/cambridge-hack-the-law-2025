@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:counterclaimer/core/theme/colors.dart';
+import '../screens/legal_arguments_screen.dart';
 
 class ArgumentsHeader extends ConsumerWidget {
   final String searchQuery;
@@ -12,6 +13,10 @@ class ArgumentsHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final strengthsCount = ref.watch(strengthsProvider).length;
+    final weaknessesCount = ref.watch(weaknessesProvider).length;
+    final casesCount = ref.watch(totalCasesProvider);
+
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 30, 24, 20), // Reduced top padding from 60 to 30
       decoration: BoxDecoration(
@@ -28,25 +33,26 @@ class ArgumentsHeader extends ConsumerWidget {
         children: [
           // Stats Row - Jus Mundi Style (without Add to Alerts)
           Row(
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
               _buildJusMundiStatIcon(
                 Icons.auto_graph_rounded,
                 'Strengths',
-                '5',
+                strengthsCount.toString(),
                 AppColors.primaryGreen,
               ),
               const SizedBox(width: 32),
               _buildJusMundiStatIcon(
                 Icons.error_outline_rounded,
                 'Weaknesses',
-                '5',
+                weaknessesCount.toString(),
                 AppColors.weaknessRed,
               ),
               const SizedBox(width: 32),
               _buildJusMundiStatIcon(
                 Icons.gavel_rounded,
                 'Cases',
-                '18',
+                casesCount.toString(),
                 AppColors.casesGrey,
               ),
             ],

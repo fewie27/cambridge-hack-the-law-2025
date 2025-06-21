@@ -39,6 +39,19 @@ class EmbeddingService:
         embedding = self.model.encode(text, show_progress_bar=False, normalize_embeddings=True)
         return embedding.tolist()
 
+    def _fix_mojibake(self, text: str) -> str:
+        """Attempt to fix common UTF-8 mis-encoding issues (mojibake)."""
+        if not isinstance(text, str):
+            return text
+        try:
+            # This sequence can repair strings that were encoded in UTF-8
+            # but were incorrectly read as latin-1 or a similar single-byte encoding.
+            # e.g., "Fenoscadiaâ\x80\x99s" -> "Fenoscadia's"
+            return text.encode('latin1').decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            # The string is likely already correctly encoded or in a different format.
+            return text
+
     def _read_case_file(self, source_file: str) -> dict:
         """Read case file content from a JSON file."""
         base_cases_path = os.path.join(os.path.dirname(__file__), '..', 'database', 'cases')
@@ -46,7 +59,8 @@ class EmbeddingService:
         if not os.path.exists(full_path):
             return {"error": "File not found", "path": full_path}
         try:
-            with open(full_path, 'r') as f:
+            # Specify UTF-8 encoding to prevent character issues
+            with open(full_path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception as e:
             return {"error": f"Failed to read or parse file: {e}", "path": full_path}
@@ -152,6 +166,27 @@ The response should only be the JSON object, without any additional text or mark
             query_embeddings=[query_embedding],
             n_results=min(top_k * 10, self.collection.count())  # Fetch a large pool for rescoring
         )
+        
+        # === FIX ENCODING ISSUES AT THE SOURCE ===
+        # The data from ChromaDB might have encoding issues (mojibake).
+        # We fix it here before it's used anywhere else.
+        if results['documents'] and results['documents'][0]:
+            results['documents'][0] = [self._fix_mojibake(doc) for doc in results['documents'][0]]
+        
+        if results['metadatas'] and results['metadatas'][0]:
+            fixed_metadatas = []
+            for meta in results['metadatas'][0]:
+                fixed_meta = {}
+                for key, value in meta.items():
+                    if isinstance(value, str):
+                        fixed_meta[key] = self._fix_mojibake(value)
+                    elif isinstance(value, list):
+                        # Also fix strings within lists
+                        fixed_meta[key] = [self._fix_mojibake(item) if isinstance(item, str) else item for item in value]
+                    else:
+                        fixed_meta[key] = value
+                fixed_metadatas.append(fixed_meta)
+            results['metadatas'][0] = fixed_metadatas
         
         # Stage 2: Metadata Rescoring
         if claimant or respondent or case_year:

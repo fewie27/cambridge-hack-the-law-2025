@@ -30,6 +30,14 @@ def sanitize_text(text: str) -> str:
     if not text or not isinstance(text, str):
         return ""
     
+    # Attempt to fix common UTF-8 mis-encoding issues (mojibake)
+    try:
+        # This can fix strings like "Fenoscadiaâ\x80\x99s" back to "Fenoscadia's"
+        text = text.encode('latin1').decode('utf-8')
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        # This will fail if the string is already valid, which is fine.
+        pass
+    
     # Decode HTML entities
     text = html.unescape(text)
     
@@ -52,6 +60,12 @@ def sanitize_text(text: str) -> str:
     text = text.replace(''', "'").replace(''', "'")
     text = text.replace('–', '-').replace('—', '-')
     text = text.replace('…', '...')
+    
+    # Remove asterisks
+    text = text.replace('*', '')
+    
+    # Remove .json extension
+    text = text.replace('.json', '')
     
     # Remove any remaining non-printable characters
     text = ''.join(char for char in text if char.isprintable() or char in '\n\t')
