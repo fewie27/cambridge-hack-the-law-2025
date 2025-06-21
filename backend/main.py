@@ -106,10 +106,8 @@ if __name__ == "__main__" or os.environ.get("GENERATE_MODELS_ONLY") == "1":
 sys.path.append(str(Path("generated")))
 
 # Import generated models (now guaranteed to exist)
-from models import HealthResponse, Argument, CaseReference, AnalysisResponse, AddCaseRequest
 
 # Import endpoint routers
-from health import health_router
 from endpoints import api_router
 
 # Create FastAPI app
@@ -131,7 +129,6 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(health_router)
 app.include_router(api_router)
 
 # --- File Watcher for live reload (optional, not blocking startup) ---

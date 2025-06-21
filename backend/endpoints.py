@@ -24,76 +24,46 @@ async def add_case(request: AddCaseRequest):
         raise HTTPException(status_code=400, detail="User prompt too long (max 1000 characters)")
     
     try:
-        # Generate a case ID based on timestamp and hash of prompt
-        import hashlib
+        # Generate a case ID
         import uuid
         case_id = f"CASE-{uuid.uuid4().hex[:8].upper()}"
         
-        # For now, return sample data until embedding service is fully implemented
-        # In production, this would use: embedding_service.search_similar_cases(request.user_prompt, top_k=10)
+        # Use the embedding service to find similar cases
+        search_results = embedding_service.search_similar_cases(request.user_prompt, top_k=5)
         
-        # Sample strengths
-        strengths = [
-            Argument(
-                argument="Strong precedent for employment discrimination claims",
-                case_references=[
-                    CaseReference(
-                        caseIdentifier="CASE-2023-001",
-                        title="Smith v. ABC Corporation",
-                        Date=date(2023, 3, 15),
-                        matchingDegree=0.92,
-                        fileReference="employment_discrimination_2023_001.pdf"
-                    ),
-                    CaseReference(
-                        caseIdentifier="CASE-2022-045",
-                        title="Johnson v. XYZ Industries",
-                        Date=date(2022, 11, 8),
-                        matchingDegree=0.87,
-                        fileReference="wrongful_termination_2022_045.pdf"
-                    )
-                ]
-            ),
-            Argument(
-                argument="Clear violation of employment contract terms",
-                case_references=[
-                    CaseReference(
-                        caseIdentifier="CASE-2023-012",
-                        title="Brown v. Tech Solutions Ltd",
-                        Date=date(2023, 1, 22),
-                        matchingDegree=0.85,
-                        fileReference="contract_violation_2023_012.pdf"
-                    )
-                ]
-            )
-        ]
-        
-        # Sample weaknesses
-        weaknesses = [
-            Argument(
-                argument="At-will employment may limit claims",
-                case_references=[
-                    CaseReference(
-                        caseIdentifier="CASE-2023-007",
-                        title="Davis v. Global Corp",
-                        Date=date(2023, 2, 10),
-                        matchingDegree=0.78,
-                        fileReference="at_will_employment_2023_007.pdf"
-                    )
-                ]
-            ),
-            Argument(
-                argument="Insufficient documentation of discriminatory behavior",
-                case_references=[
-                    CaseReference(
-                        caseIdentifier="CASE-2022-089",
-                        title="Wilson v. Manufacturing Inc",
-                        Date=None,  # Some cases might not have dates
-                        matchingDegree=0.72,
-                        fileReference="documentation_issues_2022_089.pdf"
-                    )
-                ]
-            )
-        ]
+        # Process results into AnalysisResponse format
+        strengths = []
+        if search_results and search_results['documents']:
+            # Assume all results are strengths for now
+            arguments = {}
+            
+            docs = search_results['documents'][0]
+            metadatas = search_results['metadatas'][0]
+            distances = search_results['distances'][0]
+
+            for i in range(len(docs)):
+                doc = docs[i]
+                meta = metadatas[i]
+                distance = distances[i]
+
+                # Create a CaseReference from metadata
+                case_ref = CaseReference(
+                    caseIdentifier=meta.get("case_id", "N/A"),
+                    title=meta.get("title", "Unknown Title"),
+                    Date=date.fromisoformat(meta["date"]) if meta.get("date") else None,
+                    matchingDegree=1 - distance,  # Convert distance to similarity
+                    fileReference=meta.get("file_path", "N/A")
+                )
+
+                # Group by document/argument
+                if doc not in arguments:
+                    arguments[doc] = Argument(argument=doc, case_references=[])
+                arguments[doc].case_references.append(case_ref)
+
+            strengths = list(arguments.values())
+
+        # For now, weaknesses list is empty as we don't have a mechanism to distinguish them
+        weaknesses = []
         
         return AnalysisResponse(
             caseId=case_id,
