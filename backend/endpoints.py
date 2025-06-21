@@ -8,8 +8,9 @@ import unicodedata
 # Import generated models
 from models import Argument, CaseReference, AnalysisResponse, AddCaseRequest, GenDraftRequest, GenDraftResponse
 
-# Import embedding service
+# Import services
 from services.embedding_service import EmbeddingService
+from services.document_service import DocumentService
 
 # Import case storage
 from database.case_storage import CaseStorage
@@ -19,6 +20,7 @@ api_router = APIRouter(prefix="/api/v1", tags=["API"])
 
 # Initialize services
 embedding_service = EmbeddingService()
+document_service = DocumentService()
 case_storage = CaseStorage()
 
 def sanitize_text(text: str) -> str:
@@ -212,90 +214,11 @@ async def gen_draft(case_id: str):
         
         # Convert the stored response back to an AnalysisResponse model
         analysis = AnalysisResponse(**case_response)
-
-        from datetime import date
-
-        html_template = r"""
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-        <meta charset="UTF-8">
-        <title>Claim Submissions</title>
-        <style>
-            body {{
-                font-family: "Times New Roman", serif;
-                margin: 40px;
-                line-height: 1.6;
-            }}
-            .center {{
-                text-align: center;
-            }}
-            .underline {{
-                text-decoration: underline;
-            }}
-            .italic {{
-                font-style: italic;
-            }}
-            .bold {{
-                font-weight: bold;
-            }}
-            .section-title {{
-                margin-top: 2em;
-            }}
-            blockquote {{
-                margin-left: 2em;
-                font-style: italic;
-            }}
-        </style>
-        </head>
-        <body>
-
-        <p class="center bold underline">IN THE MATTER OF THE ARBITRATION ACT 1996</p>
-        <p class="center bold underline">AND IN THE MATTER OF AN ARBITRATION</p>
-
-        <p class="center bold">BETWEEN:</p>
-
-        <p class="center bold">{claimants}<br><span class="italic">Claimants</span></p>
-
-        <p class="center bold">-and-</p>
-
-        <p class="center bold">{respondents}<br><span class="italic">Respondents</span></p>
-
-        <p class="center bold italic">{title}</p>
-
-        <hr>
-
-        <p class="center bold">CLAIM SUBMISSIONS</p>
-
-        <hr>
-
-        <h3 class="section-title">The Claimants</h3>
-
-        <p>{intro_statement}</p>
-
-        <h3 class="section-title">The contractual background</h3>
-
-        {body}
-
-        <hr style="margin-top: 3em;">
-
-        <p><strong>Date:</strong> {date}</p>
-        <p><strong>Signature:</strong> _____________________________</p>
-
-        </body>
-        </html>
-        """
-
-        return GenDraftResponse(
-            text=html_template.format(
-                claimants=f"Claimants (Case: {case_id})",
-                respondents="Respondents",
-                title="Title",
-                intro_statement="Intro Statement",
-                body="Body",
-                date=date.today().strftime("%d %B %Y")
-            )
-        )
+        
+        # Generate the document using our new service
+        document_html = document_service.generate_draft(analysis, case_id)
+        
+        return GenDraftResponse(text=document_html)
     except HTTPException:
         raise
     except Exception as e:
