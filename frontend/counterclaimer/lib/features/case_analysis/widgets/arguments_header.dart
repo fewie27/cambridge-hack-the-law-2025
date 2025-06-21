@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../screens/legal_arguments_screen.dart';
 import 'package:counterclaimer/core/theme/colors.dart';
 
 class ArgumentsHeader extends ConsumerWidget {
@@ -14,7 +13,7 @@ class ArgumentsHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 60, 24, 20),
+      padding: const EdgeInsets.fromLTRB(24, 30, 24, 20), // Reduced top padding from 60 to 30
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -27,38 +26,7 @@ class ArgumentsHeader extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          // Search Bar
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: TextField(
-              onChanged: (value) =>
-                  ref.read(searchQueryProvider.notifier).state = value,
-              decoration: InputDecoration(
-                hintText: '"Pipeline construction" AND "Environmental compliance"',
-                hintStyle: TextStyle(color: Colors.grey[500]),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF6B7280)),
-                suffixIcon: Container(
-                  margin: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF3B82F6),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Icon(Icons.search, color: Colors.white, size: 20),
-                ),
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Stats Row - Jus Mundi Style
+          // Stats Row - Jus Mundi Style (without Add to Alerts)
           Row(
             children: [
               _buildJusMundiStatIcon(
@@ -80,33 +48,6 @@ class ArgumentsHeader extends ConsumerWidget {
                 'Cases',
                 '18',
                 AppColors.casesGrey,
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF678D7F).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.notifications_none_rounded,
-                      color: const Color(0xFF678D7F),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Add to Alerts',
-                      style: TextStyle(
-                        color: const Color(0xFF678D7F),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
               ),
             ],
           ),
