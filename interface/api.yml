@@ -46,77 +46,85 @@ paths:
                     type: string
                     example: "Internal server error"
 
-  /api/v1/items:
-    get:
-      summary: Get all items
-      description: Retrieve a list of all items
-      operationId: getItems
-      parameters:
-        - name: limit
-          in: query
-          description: Maximum number of items to return
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
-        - name: offset
-          in: query
-          description: Number of items to skip
-          required: false
-          schema:
-            type: integer
-            minimum: 0
-            default: 0
+  /api/v1/add_case:
+    post:
+      summary: Add a new case with user prompt analysis
+      description: Takes a user prompt and returns arguments with related legal cases
+      operationId: addCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCaseRequest'
       responses:
         '200':
-          description: List of items retrieved successfully
+          description: Case analysis completed successfully
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: integer
-                          example: 1
-                        name:
-                          type: string
-                          example: "Sample Item"
-                        description:
-                          type: string
-                          example: "This is a sample item"
-                        created_at:
-                          type: string
-                          format: date-time
-                          example: "2024-01-01T12:00:00Z"
-                  total:
-                    type: integer
-                    example: 100
-                  limit:
-                    type: integer
-                    example: 10
-                  offset:
-                    type: integer
-                    example: 0
+                $ref: '#/components/schemas/AnalysisResponse'
         '400':
-          description: Bad request
+          description: Bad request - invalid user prompt
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Invalid parameters"
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 components:
   schemas:
+    AddCaseRequest:
+      type: object
+      properties:
+        user_prompt:
+          type: string
+          description: The user prompt to analyze
+          example: "Can I sue my employer for wrongful termination?"
+      required:
+        - user_prompt
+    AnalysisResponse:
+      type: object
+      properties:
+        arguments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Argument'
+    Argument:
+      type: object
+      properties:
+        argument:
+          type: string
+          description: The legal argument
+          example: "Wrongful termination based on discrimination"
+        relatedCases:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelatedCase'
+    
+    RelatedCase:
+      type: object
+      properties:
+        caseIdentifier:
+          type: string
+          description: Unique identifier for the case
+          example: "CASE-2024-001"
+        status:
+          type: string
+          description: Current status of the case
+          example: "Closed"
+        matching:
+          type: integer
+          description: Matching score (0-100)
+          minimum: 0
+          maximum: 100
+          example: 85
+    
     Error:
       type: object
       properties:

@@ -47,11 +47,10 @@ cambridge/
    # Health check
    curl http://localhost:8000/health
    
-   # Get items
-   curl http://localhost:8000/api/v1/items
-   
-   # Get items with pagination
-   curl "http://localhost:8000/api/v1/items?limit=2&offset=1"
+   # Add a case with prompt analysis
+   curl -X POST http://localhost:8000/api/v1/add_case \
+     -H "Content-Type: application/json" \
+     -d '{"user_prompt": "Can I sue my employer for wrongful termination?"}'
    ```
 
 ### Development Mode
@@ -73,11 +72,15 @@ cambridge/
 - **GET** `/health`
 - Returns API health status
 
-### Items
-- **GET** `/api/v1/items`
-- Query parameters:
-  - `limit` (optional): Number of items to return (1-100, default: 10)
-  - `offset` (optional): Number of items to skip (default: 0)
+### Add Case
+- **POST** `/api/v1/add_case`
+- Request body:
+  ```json
+  {
+    "user_prompt": "The user prompt to analyze"
+  }
+  ```
+- Returns arguments with related legal cases
 
 ## Modifying the API
 
@@ -87,9 +90,18 @@ cambridge/
    ```yaml
    paths:
      /api/v1/new-endpoint:
-       get:
+       post:
          summary: New endpoint
-         operationId: getNewEndpoint
+         operationId: postNewEndpoint
+         requestBody:
+           required: true
+           content:
+             application/json:
+               schema:
+                 type: object
+                 properties:
+                   data:
+                     type: string
          responses:
            '200':
              description: Success
@@ -98,7 +110,7 @@ cambridge/
                  schema:
                    type: object
                    properties:
-                     data:
+                     result:
                        type: string
    ```
 
@@ -106,9 +118,9 @@ cambridge/
 
 3. **Add the endpoint implementation** in `backend/main.py`:
    ```python
-   @app.get("/api/v1/new-endpoint")
-   async def get_new_endpoint():
-       return {"data": "Hello from new endpoint"}
+   @app.post("/api/v1/new-endpoint")
+   async def post_new_endpoint(request: NewEndpointRequest):
+       return {"result": "Hello from new endpoint"}
    ```
 
 ### Adding New Models
@@ -166,6 +178,7 @@ docker-compose exec backend python -c "print('Hello from container')"
 - [ ] API versioning
 - [ ] Rate limiting
 - [ ] Logging and monitoring
+- [ ] AI/NLP integration for prompt analysis
 
 ## Troubleshooting
 
