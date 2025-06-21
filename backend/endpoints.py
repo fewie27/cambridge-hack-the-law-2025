@@ -28,8 +28,22 @@ async def add_case(request: AddCaseRequest):
         import uuid
         case_id = f"CASE-{uuid.uuid4().hex[:8].upper()}"
         
+        # Extract metadata from the user's prompt
+        extracted_metadata = embedding_service.extract_metadata_from_prompt(request.user_prompt)
+
+        # Use the explicit fields if provided, otherwise use the extracted metadata
+        claimant = request.claimant or extracted_metadata.get("claimant")
+        respondent = request.respondent or extracted_metadata.get("respondent")
+        case_year = request.case_year or extracted_metadata.get("case_year")
+        
         # Use the embedding service to find and analyze similar cases
-        structured_analysis = embedding_service.search_similar_cases(request.user_prompt, top_k=5)
+        structured_analysis = embedding_service.search_similar_cases(
+            user_prompt=request.user_prompt, 
+            top_k=15,
+            claimant=claimant,
+            respondent=respondent,
+            case_year=case_year
+        )
         
         def convert_to_arguments(analysis_list):
             """Converts a list of dicts into a list of Argument Pydantic models."""
