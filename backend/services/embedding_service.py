@@ -1,17 +1,18 @@
 import os
-import torch
-import numpy as np
-from transformers import AutoTokenizer, AutoModel
-from chromadb import PersistentClient
+from sentence_transformers import SentenceTransformer
+import chromadb
 import json
 import google.generativeai as genai
 from dotenv import load_dotenv
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 # Load environment variables from .env file
 load_dotenv()
 
 # === Configuration ===
-MODEL_NAME = "nlpaueb/legal-bert-base-uncased"
+# Ensure this is the same model used in parseCases.py
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 DATA_DIR = os.path.join(os.path.dirname(__file__), '..', 'database', 'chroma_data')
 COLLECTION_NAME = "legal_cases"
 
@@ -26,29 +27,16 @@ class EmbeddingService:
             # Handle cases where API key is not set
             raise RuntimeError("GEMINI_API_KEY environment variable not set.") from e
 
-        self.device = torch.device("mps" if torch.has_mps else "cpu")
-        self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-        self.model = AutoModel.from_pretrained(MODEL_NAME).to(self.device)
-        self.model.eval()
+        # Load the SentenceTransformer model
+        self.model = SentenceTransformer(MODEL_NAME)
 
         # Initialize Chroma client and get collection
-        self.client = PersistentClient(path=DATA_DIR)
+        self.client = chromadb.PersistentClient(path=DATA_DIR)
         self.collection = self.client.get_or_create_collection(COLLECTION_NAME)
 
     def _embed_text(self, text: str) -> list:
-        """Embed text using the loaded model"""
-        inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            last_hidden_state = outputs.last_hidden_state
-            attention_mask = inputs['attention_mask']
-            mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
-            summed = torch.sum(last_hidden_state * mask_expanded, 1)
-            counts = torch.clamp(mask_expanded.sum(1), min=1e-9)
-            mean_pooled = summed / counts
-        embedding = mean_pooled[0].cpu().numpy()
-        embedding = embedding / np.linalg.norm(embedding)
+        """Embed text using the SentenceTransformer model."""
+        embedding = self.model.encode(text, show_progress_bar=False, normalize_embeddings=True)
         return embedding.tolist()
 
     def _read_case_file(self, source_file: str) -> dict:
@@ -62,6 +50,31 @@ class EmbeddingService:
                 return json.load(f)
         except Exception as e:
             return {"error": f"Failed to read or parse file: {e}", "path": full_path}
+
+    def extract_metadata_from_prompt(self, user_prompt: str) -> dict:
+        """Extracts claimant, respondent, and year from a user prompt using Gemini."""
+        prompt = f"""
+From the following text, extract the claimant, the respondent, and the year of the case. 
+Return the information as a JSON object with the keys "claimant", "respondent", and "case_year".
+If a value is not found, set it to null.
+
+Text: "{user_prompt}"
+
+JSON:
+"""
+        try:
+            response = self.gen_model.generate_content(prompt)
+            # Clean up potential markdown and parse
+            cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
+            metadata = json.loads(cleaned_response)
+            return {
+                "claimant": metadata.get("claimant"),
+                "respondent": metadata.get("respondent"),
+                "case_year": metadata.get("case_year")
+            }
+        except Exception as e:
+            print(f"Error extracting metadata from prompt: {e}")
+            return {"claimant": None, "respondent": None, "case_year": None}
 
     def _analyze_with_gemini(self, user_prompt: str, cases_data: list) -> dict:
         """Analyze cases with Gemini and return structured arguments."""
@@ -92,10 +105,12 @@ class EmbeddingService:
         cases_text = "\n---\n".join(case_details)
         prompt = f"""
 You are a legal analysis expert. Your task is to analyze a user's legal query and a set of relevant case documents. 
+Your goal is to generate a diverse set of arguments, covering as many of the provided cases as possible.
+
 You must identify key arguments, but only those that are directly supported by the provided case documents. 
 Each argument must be derived from the content of at least one case, and must reference at least one of the provided case documents.
 
-For both strengths and weaknesses, always try to find at least one argument if possible, even if the evidence is indirect or weak.
+For both strengths and weaknesses, always try to find at least one argument if possible. Strive to create multiple distinct arguments for each category if the documents support it.
 
 **User's Query:**
 "{user_prompt}"
@@ -110,6 +125,8 @@ Each argument object in the list should have two keys:
 1. "argument": A string describing the argument you have formulated, based on the content of the case(s).
 2. "case_references": A list of case identifiers (the source_file from the case data) that support this argument. This list must never be empty.
 
+If you cannot find a clear weakness, provide the closest possible counterpoint or limitation you can infer from the cases.
+
 The response should only be the JSON object, without any additional text or markdown.
 """
         try:
@@ -120,31 +137,76 @@ The response should only be the JSON object, without any additional text or mark
             print(f"Error calling Gemini or parsing response: {e}")
             return {"strengths": [], "weaknesses": []}
 
-    def search_similar_cases(self, user_prompt: str, top_k: int = 10):
+    def search_similar_cases(self, user_prompt: str, top_k: int = 10, claimant: str = None, respondent: str = None, case_year: int = None):
         """
-        Search for similar cases, then use Gemini to analyze and structure the results.
+        Search for similar cases using a two-stage process:
+        1. Broad semantic search based on the user prompt.
+        2. Rescore the top results based on metadata similarity.
         """
         if self.collection.count() == 0:
             return {"strengths": [], "weaknesses": []}
+
+        # Stage 1: Broad semantic search
         query_embedding = self._embed_text(user_prompt)
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=min(top_k, self.collection.count()) 
+            n_results=min(top_k * 10, self.collection.count())  # Fetch a large pool for rescoring
         )
+        
+        # Stage 2: Metadata Rescoring
+        if claimant or respondent or case_year:
+            # Create the query's metadata string
+            query_meta_parts = []
+            if claimant: query_meta_parts.append(f"Claimant: {claimant}")
+            if respondent: query_meta_parts.append(f"Respondent: {respondent}")
+            if case_year: query_meta_parts.append(f"Year: {case_year}")
+            query_meta_str = ". ".join(query_meta_parts)
+            query_meta_embedding = self._embed_text(query_meta_str)
+
+            # Create metadata strings for each result
+            result_meta_strs = []
+            for meta in results['metadatas'][0]:
+                meta_parts = []
+                if meta.get("PartyNationalities"): meta_parts.append(f"Parties: {meta['PartyNationalities']}")
+                if meta.get("DecisionDate"): meta_parts.append(f"Date: {meta['DecisionDate']}")
+                result_meta_strs.append(". ".join(meta_parts))
+
+            # Embed all result metadata strings at once for efficiency
+            result_meta_embeddings = self.model.encode(result_meta_strs)
+            
+            # Calculate cosine similarity between query metadata and result metadata
+            meta_similarities = cosine_similarity([query_meta_embedding], result_meta_embeddings)[0]
+            
+            # Combine semantic distance and metadata similarity into a new score
+            # We convert semantic distance to similarity (1 - distance)
+            semantic_similarities = [1 - dist for dist in results['distances'][0]]
+            
+            # Weighted average: 70% semantic, 30% metadata. Tune as needed.
+            combined_scores = (0.7 * np.array(semantic_similarities)) + (0.3 * np.array(meta_similarities))
+            
+            # Get the indices of the top_k results based on the new combined score
+            top_indices = np.argsort(combined_scores)[::-1][:top_k]
+
+        else:
+            # If no metadata is provided, just use the top semantic results
+            top_indices = list(range(top_k))
+
+        # Build the final list of cases for Gemini
         cases_for_gemini = []
-        if results and results['metadatas']:
-            for i, meta in enumerate(results['metadatas'][0]):
-                source_file = meta.get("source_file")
-                if source_file:
-                    full_case_data = self._read_case_file(source_file)
-                    results['metadatas'][0][i]['full_case_data'] = full_case_data
-                    cases_for_gemini.append({
-                        "document": results['documents'][0][i],
-                        "metadata": results['metadatas'][0][i],
-                        "distance": results['distances'][0][i]
-                    })
+        for i in top_indices:
+            meta = results['metadatas'][0][i]
+            source_file = meta.get("source_file")
+            if source_file:
+                full_case_data = self._read_case_file(source_file)
+                meta['full_case_data'] = full_case_data
+                cases_for_gemini.append({
+                    "document": results['documents'][0][i],
+                    "metadata": meta,
+                    "distance": results['distances'][0][i] 
+                })
+
         if not cases_for_gemini:
-            print("No cases for gemini analysis found.")
+            print("No cases for Gemini analysis found after rescoring.")
             return {"strengths": [], "weaknesses": []}
         structured_analysis = self._analyze_with_gemini(user_prompt, cases_for_gemini)
         case_lookup = {case['metadata']['source_file']: case for case in cases_for_gemini}
