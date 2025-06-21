@@ -199,8 +199,9 @@ class OpenAPIWatcher(FileSystemEventHandler):
 
 def setup_openapi_watcher():
     """Setup file watcher for OpenAPI spec changes"""
-    spec_path = Path(__file__).parent.parent / "interface" / "api.yml"
-    output_dir = Path(__file__).parent / "generated"
+    # In container, the interface is mounted at /app/interface
+    spec_path = Path("/app/interface/api.yml")
+    output_dir = Path("/app/generated")
     
     generator = OpenAPIGenerator(str(spec_path), str(output_dir))
     
