@@ -19,8 +19,9 @@ void main() async {
   // Load environment variables
   // await dotenv.load(fileName: ".env");
   
-ApiService apiService = ApiService();
-apiService.addCase("test");
+  ApiService apiService = ApiService();
+  apiService.addCase("test");
+  print("test");
 
   runApp(const ProviderScope(child: CounterclaimerApp()));
 }
