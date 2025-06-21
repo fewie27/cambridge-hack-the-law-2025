@@ -91,10 +91,19 @@ components:
     AnalysisResponse:
       type: object
       properties:
-        arguments:
+        caseId:
+          type: string
+          description: Unique identifier for the analyzed case
+          example: "CASE-2024-001"
+        strengths:
           type: array
           items:
             $ref: '#/components/schemas/Argument'
+        weaknesses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Argument'
+    
     Argument:
       type: object
       properties:
@@ -102,28 +111,39 @@ components:
           type: string
           description: The legal argument
           example: "Wrongful termination based on discrimination"
-        relatedCases:
+        case_references:
           type: array
           items:
-            $ref: '#/components/schemas/RelatedCase'
+            $ref: '#/components/schemas/CaseReference'
     
-    RelatedCase:
+    CaseReference:
       type: object
       properties:
         caseIdentifier:
           type: string
           description: Unique identifier for the case
           example: "CASE-2024-001"
-        status:
+        title:
           type: string
-          description: Current status of the case
-          example: "Closed"
-        matching:
-          type: integer
-          description: Matching score (0-100)
-          minimum: 0
-          maximum: 100
-          example: 85
+          description: Title of the case
+          example: "Smith v. ABC Corporation"
+        Date:
+          type: string
+          format: date
+          description: Date of the case
+          example: "2024-01-15"
+          nullable: true
+        matchingDegree:
+          type: number
+          format: double
+          description: Matching degree score
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.85
+        fileReference:
+          type: string
+          description: Reference to the case file
+          example: "doc_12345.pdf"
     
     Error:
       type: object
