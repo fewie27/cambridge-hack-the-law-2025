@@ -66,6 +66,37 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/v1/gen_draft:
+    post:
+      summary: Generate a legal draft for a case
+      description: Takes a case ID and returns a generated legal draft text
+      operationId: genDraft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenDraftRequest'
+      responses:
+        '200':
+          description: Draft generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenDraftResponse'
+        '404':
+          description: Case not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
 components:
   schemas:
     AddCaseRequest:
@@ -156,4 +187,24 @@ components:
           description: Error message
         code:
           type: string
-          description: Error code 
+          description: Error code
+
+    GenDraftRequest:
+      type: object
+      properties:
+        case_id:
+          type: string
+          description: The ID of the case to generate a draft for
+          example: "CASE-2024-001"
+      required:
+        - case_id
+    
+    GenDraftResponse:
+      type: object
+      properties:
+        text:
+          type: string
+          description: The generated legal draft text
+          example: "DRAFT LEGAL DOCUMENT..."
+      required:
+        - text 

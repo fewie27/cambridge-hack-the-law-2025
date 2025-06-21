@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 # Import generated models
-from models import HealthResponse, Argument, CaseReference, AnalysisResponse, AddCaseRequest
+from models import HealthResponse, Argument, CaseReference, AnalysisResponse, AddCaseRequest, GenDraftRequest, GenDraftResponse
 
 # Import embedding service
 from services.embedding_service import EmbeddingService
@@ -69,4 +69,18 @@ async def add_case(request: AddCaseRequest):
         
     except Exception as e:
         print(f"Error in add_case: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+@api_router.post("/gen_draft", response_model=GenDraftResponse)
+async def gen_draft(request: GenDraftRequest):
+    """Generate a legal draft for a case"""
+    try:
+        # TODO: Implement actual draft generation logic
+        # For now, return a dummy response
+        return GenDraftResponse(
+            text=f"This is a dummy legal draft for case {request.case_id}. "
+                 "The actual implementation will generate a proper legal document based on the case details and similar cases."
+        )
+    except Exception as e:
+        print(f"Error in gen_draft: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") 
