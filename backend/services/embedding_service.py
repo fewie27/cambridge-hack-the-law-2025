@@ -21,7 +21,7 @@ class EmbeddingService:
         # Configure Gemini API
         try:
             genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-            self.gen_model = genai.GenerativeModel('gemini-1.5-flash')
+            self.gen_model = genai.GenerativeModel('gemini-1.5-pro')
         except Exception as e:
             # Handle cases where API key is not set
             raise RuntimeError("GEMINI_API_KEY environment variable not set.") from e
@@ -65,44 +65,53 @@ class EmbeddingService:
 
     def _analyze_with_gemini(self, user_prompt: str, cases_data: list) -> dict:
         """Analyze cases with Gemini and return structured arguments."""
-        print(cases_data)
         case_details = []
         for case in cases_data:
             meta = case['metadata']
             source_file = meta.get('source_file', 'N/A')
             title = meta.get('Title') or meta.get('title') or source_file
+            status = meta.get('Status', '')
+            decision_type = meta.get('DecisionType', '')
+            institution = meta.get('Institution', '')
             full_data = meta.get('full_case_data', {})
-            # Try to get a summary/headnote from the JSON if available
             summary = full_data.get('summary') or full_data.get('headnote') or ''
             if summary:
                 summary = summary[:500] + ('...' if len(summary) > 500 else '')
-            # Use the document chunk (already relevant)
-            chunk = case['document'][:500] + ('...' if len(case['document']) > 500 else '')
-            # Compose a concise case summary
+            chunk = case['document'][:1000] + ('...' if len(case['document']) > 1000 else '')
             case_text = f"Title: {title}\nSource File: {source_file}\n"
+            if status:
+                case_text += f"Status: {status}\n"
+            if decision_type:
+                case_text += f"Decision Type: {decision_type}\n"
+            if institution:
+                case_text += f"Institution: {institution}\n"
             if summary:
                 case_text += f"Summary: {summary}\n"
             case_text += f"Relevant Excerpt: {chunk}"
             case_details.append(case_text)
         cases_text = "\n---\n".join(case_details)
         prompt = f"""
-            You are a legal analysis expert. Your task is to analyze a user's legal query and a set of relevant case documents. Based on this information, you must identify key arguments, classify them as strengths or weaknesses for the user's position, and group the provided case documents under the most relevant argument.
-            
-            **User's Query:**
-            "{user_prompt}"
-            
-            **Relevant Case Documents:**
-            {cases_text}
-            
-            **Your Task:**
-            Generate a JSON response with two main keys: "strengths" and "weaknesses".
-            Each key should contain a list of arguments.
-            Each argument object in the list should have two keys:
-            1. "argument": A string describing the argument you have formulated.
-            2. "case_references": A list of case identifiers (the source_file from the case data) that support this argument.
-            
-            The response should only be the JSON object, without any additional text or markdown.
-        """
+You are a legal analysis expert. Your task is to analyze a user's legal query and a set of relevant case documents. 
+You must identify key arguments, but only those that are directly supported by the provided case documents. 
+Each argument must be derived from the content of at least one case, and must reference at least one of the provided case documents.
+
+For both strengths and weaknesses, always try to find at least one argument if possible, even if the evidence is indirect or weak.
+
+**User's Query:**
+"{user_prompt}"
+
+**Relevant Case Documents:**
+{cases_text}
+
+**Your Task:**
+Generate a JSON response with two main keys: "strengths" and "weaknesses".
+Each key should contain a list of arguments.
+Each argument object in the list should have two keys:
+1. "argument": A string describing the argument you have formulated, based on the content of the case(s).
+2. "case_references": A list of case identifiers (the source_file from the case data) that support this argument. This list must never be empty.
+
+The response should only be the JSON object, without any additional text or markdown.
+"""
         try:
             response = self.gen_model.generate_content(prompt)
             cleaned_response = response.text.strip().replace("```json", "").replace("```", "")
@@ -142,13 +151,14 @@ class EmbeddingService:
         def process_arguments(arg_list):
             processed_list = []
             for arg in arg_list:
+                # Only keep arguments with at least one valid case reference
+                valid_refs = [source_file for source_file in arg.get("case_references", []) if source_file in case_lookup]
+                if not valid_refs:
+                    continue
                 processed_arg = {
                     "argument": arg.get("argument"),
-                    "case_references": []
+                    "case_references": [case_lookup[source_file] for source_file in valid_refs]
                 }
-                for source_file in arg.get("case_references", []):
-                    if source_file in case_lookup:
-                        processed_arg["case_references"].append(case_lookup[source_file])
                 processed_list.append(processed_arg)
             return processed_list
         final_result = {
