@@ -109,12 +109,38 @@ class ArgumentDetail extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        'Supporting Precedent Cases',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: argumentColor, // Dynamic color
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Text(
+                              'Supporting Precedent Cases',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: argumentColor, // Dynamic color
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: argumentColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: argumentColor.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                '${argument.precedentCases.length}',
+                                style: TextStyle(
+                                  color: argumentColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

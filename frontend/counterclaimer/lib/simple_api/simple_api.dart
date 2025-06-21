@@ -66,6 +66,14 @@ class CaseReference {
   final String? date;
   final double matchingDegree;
   final String sourcefileRawMd;
+  final String? caseNumber;
+  final List<String> industries;
+  final String? status;
+  final List<String> partyNationalities;
+  final String? institution;
+  final List<String> rulesOfArbitration;
+  final List<String> applicableTreaties;
+  final List<Map<String, dynamic>> decisions;
 
   CaseReference({
     required this.caseIdentifier,
@@ -73,6 +81,14 @@ class CaseReference {
     this.date,
     required this.matchingDegree,
     required this.sourcefileRawMd,
+    this.caseNumber,
+    this.industries = const [],
+    this.status,
+    this.partyNationalities = const [],
+    this.institution,
+    this.rulesOfArbitration = const [],
+    this.applicableTreaties = const [],
+    this.decisions = const [],
   });
 
   factory CaseReference.fromJson(Map<String, dynamic> json) => CaseReference(
@@ -81,6 +97,24 @@ class CaseReference {
         date: json['Date'],
         matchingDegree: json['matchingDegree'].toDouble(),
         sourcefileRawMd: json['sourcefile_raw_md'],
+        caseNumber: json['caseNumber'],
+        industries: json['industries'] != null 
+            ? List<String>.from(json['industries'])
+            : const [],
+        status: json['status'],
+        partyNationalities: json['partyNationalities'] != null 
+            ? List<String>.from(json['partyNationalities'])
+            : const [],
+        institution: json['institution'],
+        rulesOfArbitration: json['rulesOfArbitration'] != null 
+            ? List<String>.from(json['rulesOfArbitration'])
+            : const [],
+        applicableTreaties: json['applicableTreaties'] != null 
+            ? List<String>.from(json['applicableTreaties'])
+            : const [],
+        decisions: json['decisions'] != null 
+            ? List<Map<String, dynamic>>.from(json['decisions'])
+            : const [],
       );
 }
 
