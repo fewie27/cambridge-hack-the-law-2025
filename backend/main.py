@@ -9,9 +9,8 @@ from typing import List, Optional
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 import uvicorn
 
 # --- Model Generator ---
@@ -102,6 +101,11 @@ sys.path.append(str(Path("/app/generated")))
 # Import generated models (now guaranteed to exist)
 from models import HealthResponse, Argument, RelatedCase, AnalysisResponse, AddCaseRequest
 
+# Import endpoint routers
+from health import health_router
+from endpoints import api_router
+
+# Create FastAPI app
 app = FastAPI(
     title="Cambridge API",
     description="A REST API for Cambridge application",
@@ -110,6 +114,7 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -118,54 +123,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MOCK_CASES = [
-    RelatedCase(
-        caseIdentifier="CASE-2024-001",
-        status="Closed",
-        matching=85
-    ),
-    RelatedCase(
-        caseIdentifier="CASE-2023-045",
-        status="Active",
-        matching=72
-    ),
-    RelatedCase(
-        caseIdentifier="CASE-2023-089",
-        status="Closed",
-        matching=68
-    )
-]
-
-MOCK_ARGUMENTS = [
-    Argument(
-        argument="Wrongful termination based on discrimination",
-        relatedCases=[MOCK_CASES[0], MOCK_CASES[1]]
-    ),
-    Argument(
-        argument="Breach of employment contract",
-        relatedCases=[MOCK_CASES[2]]
-    ),
-    Argument(
-        argument="Retaliation for whistleblowing",
-        relatedCases=[MOCK_CASES[1]]
-    )
-]
-
-@app.get("/health", response_model=HealthResponse)
-async def get_health():
-    return HealthResponse(
-        status="healthy",
-        timestamp=datetime.now(),
-        version="1.0.0"
-    )
-
-@app.post("/api/v1/add_case", response_model=AnalysisResponse)
-async def add_case(request: AddCaseRequest):
-    if not request.user_prompt or len(request.user_prompt.strip()) == 0:
-        raise HTTPException(status_code=400, detail="User prompt cannot be empty")
-    if len(request.user_prompt) > 1000:
-        raise HTTPException(status_code=400, detail="User prompt too long (max 1000 characters)")
-    return AnalysisResponse(arguments=MOCK_ARGUMENTS)
+# Include routers
+app.include_router(health_router)
+app.include_router(api_router)
 
 # --- File Watcher for live reload (optional, not blocking startup) ---
 class OpenAPIWatcher(FileSystemEventHandler):
