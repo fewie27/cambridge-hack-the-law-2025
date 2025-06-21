@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:counterclaimer/core/theme/app_theme.dart';
 import 'package:counterclaimer/features/app_shell.dart';
-// ⭐ AGGIUNGI QUESTO IMPORT ⭐
+import 'package:counterclaimer/core/simple_api.dart';
 import 'package:counterclaimer/features/chatbot/screens/animated_welcome_screen.dart';
 // import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:counterclaimer/core/api_service.dart';
@@ -18,12 +18,12 @@ void main() async {
     DeviceOrientation.landscapeRight,
   ]);
   
-  // Load environment variables
-  // await dotenv.load(fileName: ".env");
-  
-  ApiService apiService = ApiService();
-  apiService.addCase("test");
-  print("test");
+  try {
+    final analysis = await CambridgeApi.addCase(AddCaseRequest("My employer fired me unfairly."));
+    print('API Response: $analysis');
+  } catch (e) {
+    print('Error calling API: $e');
+  }
 
   runApp(const ProviderScope(child: CounterclaimerApp()));
 }
