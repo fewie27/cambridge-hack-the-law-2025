@@ -1,0 +1,136 @@
+openapi: 3.0.3
+info:
+  title: Cambridge API
+  description: A REST API for Cambridge application
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@cambridge.com
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the API
+      operationId: getHealth
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2024-01-01T12:00:00Z"
+                  version:
+                    type: string
+                    example: "1.0.0"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Internal server error"
+
+  /api/v1/add_case:
+    post:
+      summary: Add a new case with user prompt analysis
+      description: Takes a user prompt and returns arguments with related legal cases
+      operationId: addCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCaseRequest'
+      responses:
+        '200':
+          description: Case analysis completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '400':
+          description: Bad request - invalid user prompt
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    AddCaseRequest:
+      type: object
+      properties:
+        user_prompt:
+          type: string
+          description: The user prompt to analyze
+          example: "Can I sue my employer for wrongful termination?"
+      required:
+        - user_prompt
+    AnalysisResponse:
+      type: object
+      properties:
+        arguments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Argument'
+    Argument:
+      type: object
+      properties:
+        argument:
+          type: string
+          description: The legal argument
+          example: "Wrongful termination based on discrimination"
+        relatedCases:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelatedCase'
+    
+    RelatedCase:
+      type: object
+      properties:
+        caseIdentifier:
+          type: string
+          description: Unique identifier for the case
+          example: "CASE-2024-001"
+        status:
+          type: string
+          description: Current status of the case
+          example: "Closed"
+        matching:
+          type: integer
+          description: Matching score (0-100)
+          minimum: 0
+          maximum: 100
+          example: 85
+    
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code 
