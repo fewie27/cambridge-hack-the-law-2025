@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../screens/legal_arguments_screen.dart';
 import 'package:counterclaimer/core/theme/colors.dart';
+import 'case_detail_popup.dart';
 
 class ArgumentDetail extends ConsumerWidget {
   final LegalArgument argument;
@@ -121,7 +122,7 @@ class ArgumentDetail extends ConsumerWidget {
                   const SizedBox(height: 16),
                   
                   ...argument.precedentCases.map((precedentCase) => 
-                    _buildPrecedentCaseCard(precedentCase, argumentColor),
+                    _buildPrecedentCaseCard(context, precedentCase, argumentColor),
                   ).toList(),
                 ],
               ),
@@ -132,113 +133,145 @@ class ArgumentDetail extends ConsumerWidget {
     );
   }
 
-  Widget _buildPrecedentCaseCard(PrecedentCase precedentCase, Color argumentColor) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
-      decoration: BoxDecoration(
-        color: AppColors.backgroundWhite,
-        border: Border(
-          top: BorderSide(color: AppColors.borderLight.withOpacity(0.5), width: 0.5),
-          bottom: BorderSide(color: AppColors.borderLight.withOpacity(0.5), width: 0.5),
+  Widget _buildPrecedentCaseCard(BuildContext context, PrecedentCase precedentCase, Color argumentColor) {
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => CaseDetailPopup(
+            precedentCase: precedentCase,
+            accentColor: argumentColor,
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 0, horizontal: 0),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundWhite,
+          border: Border(
+            top: BorderSide(color: AppColors.borderLight.withOpacity(0.5), width: 0.5),
+            bottom: BorderSide(color: AppColors.borderLight.withOpacity(0.5), width: 0.5),
+          ),
         ),
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            // Dynamic colored left border bar
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: argumentColor, // Dynamic color
-              ),
-            ),
-            
-            // Main content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Year badge and case number with dynamic color
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: argumentColor.withOpacity(0.1), // Dynamic color
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: argumentColor.withOpacity(0.3), // Dynamic color
-                              width: 0.5,
-                            ),
-                          ),
-                          child: Text(
-                            precedentCase.year,
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                              color: argumentColor, // Dynamic color
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          precedentCase.caseNumber,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textLight,
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Case Name (main title) with dynamic color
-                    Text(
-                      precedentCase.caseName,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: argumentColor, // Dynamic color instead of fixed green
-                        height: 1.4,
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Relevant Holding
-                    Text(
-                      precedentCase.relevantHolding,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.textMedium,
-                        height: 1.4,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    
-                    const SizedBox(height: 6),
-                    
-                    // Citation
-                    Text(
-                      precedentCase.citation,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.textLight,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                  ],
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              // Dynamic colored left border bar
+              Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  color: argumentColor, // Dynamic color
                 ),
               ),
-            ),
-          ],
+              
+              // Main content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Year badge and case number with dynamic color
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: argumentColor.withOpacity(0.1), // Dynamic color
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: argumentColor.withOpacity(0.3), // Dynamic color
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Text(
+                              precedentCase.year,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: argumentColor, // Dynamic color
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            precedentCase.caseNumber,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 8),
+                      
+                      // Case Name (main title) with dynamic color
+                      Text(
+                        precedentCase.caseName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: argumentColor, // Dynamic color instead of fixed green
+                          height: 1.4,
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 8),
+                      
+                      // Relevant Holding
+                      Text(
+                        precedentCase.relevantHolding,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.textMedium,
+                          height: 1.4,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      
+                      const SizedBox(height: 6),
+                      
+                      // Citation
+                      Text(
+                        precedentCase.citation,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.textLight,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      
+                      // Click indicator
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.open_in_new,
+                            size: 12,
+                            color: argumentColor.withOpacity(0.6),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Click for details',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: argumentColor.withOpacity(0.6),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
