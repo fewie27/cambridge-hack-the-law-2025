@@ -102,6 +102,7 @@ class AnalysisResponse {
       );
 }
 
+
 class ErrorResponse {
   final String error;
   final String code;
@@ -134,6 +135,7 @@ class CambridgeApi {
     );
 
     if (res.statusCode == 200) {
+      print(res.body);
       return AnalysisResponse.fromJson(jsonDecode(res.body));
     } else {
       throw Exception('Add case failed: ${res.body}');

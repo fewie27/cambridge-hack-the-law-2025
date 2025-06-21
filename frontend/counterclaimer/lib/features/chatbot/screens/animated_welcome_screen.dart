@@ -6,6 +6,7 @@ import 'package:counterclaimer/core/theme/colors.dart';
 // Provider per gestire lo stato della transizione
 final welcomeStateProvider = StateProvider<WelcomeState>((ref) => WelcomeState.welcome);
 final chatMessagesProvider = StateProvider<List<ChatMessage>>((ref) => []);
+final chatWidthProvider = StateProvider<double>((ref) => 300.0); // Larghezza iniziale chat
 
 enum WelcomeState { welcome, transitioning, chat }
 
@@ -37,31 +38,78 @@ class _AnimatedWelcomeScreenState extends ConsumerState<AnimatedWelcomeScreen>
     with TickerProviderStateMixin {
   
   late AnimationController _slideController;
-  late Animation<double> _slideAnimation;
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  
+  late Animation<Offset> _slideAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _appSlideAnimation;
   
   @override
   void initState() {
     super.initState();
     
-    // Controller per l'animazione di slide (da 1.0 a 0.4 invece che a 0)
+    // Controller principale per slide
     _slideController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    
+    // Controller per fade
+    _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     
-    // Animazione che riduce la width della welcome screen da 100% a 40%
-    _slideAnimation = Tween<double>(
-      begin: 1.0, // Schermo intero
-      end: 0.4,   // 40% dello schermo (chat a destra)
+    // Controller per scale
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    
+    // Welcome screen slides out to the right
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(1.0, 0.0),
     ).animate(CurvedAnimation(
       parent: _slideController,
-      curve: Curves.easeInOut,
+      curve: const Interval(0.0, 0.7, curve: Curves.easeInQuart),
+    ));
+    
+    // Welcome screen fades out
+    _fadeAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    ));
+    
+    // Chat scales in from small
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _scaleController,
+      curve: Curves.elasticOut,
+    ));
+    
+    // App slides in from left
+    _appSlideAnimation = Tween<double>(
+      begin: -1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: const Interval(0.3, 1.0, curve: Curves.easeOutCubic),
     ));
   }
   
   @override
   void dispose() {
     _slideController.dispose();
+    _fadeController.dispose();
+    _scaleController.dispose();
     super.dispose();
   }
   
@@ -78,16 +126,25 @@ class _AnimatedWelcomeScreenState extends ConsumerState<AnimatedWelcomeScreen>
     ];
     
     ref.read(welcomeStateProvider.notifier).state = WelcomeState.transitioning;
-    _slideController.forward().then((_) {
+    
+    // Avvia tutte le animazioni in sequenza
+    _fadeController.forward();
+    _slideController.forward();
+    
+    Future.delayed(const Duration(milliseconds: 600), () {
+      _scaleController.forward();
+    });
+    
+    Future.delayed(const Duration(milliseconds: 1200), () {
       ref.read(welcomeStateProvider.notifier).state = WelcomeState.chat;
       
-      // Simula una risposta del bot dopo 1 secondo
+      // Simula risposta del bot
       Future.delayed(const Duration(seconds: 1), () {
         final currentMessages = ref.read(chatMessagesProvider);
         ref.read(chatMessagesProvider.notifier).state = [
           ...currentMessages,
           ChatMessage(
-            text: "Ho ricevuto la tua richiesta: \"$userMessage\". Come posso aiutarti ulteriormente?",
+            text: "Perfect! I've analyzed your request: \"$userMessage\". How can I assist you further?",
             isUser: false,
             timestamp: DateTime.now(),
           ),
@@ -99,171 +156,477 @@ class _AnimatedWelcomeScreenState extends ConsumerState<AnimatedWelcomeScreen>
   @override
   Widget build(BuildContext context) {
     final welcomeState = ref.watch(welcomeStateProvider);
+    final chatWidth = ref.watch(chatWidthProvider);
     
     return Scaffold(
-      body: Row(
+      body: Stack(
         children: [
-          // App principale (a sinistra, si espande quando la chat appare)
-          Expanded(
-            flex: welcomeState == WelcomeState.chat ? 60 : 0,
-            child: welcomeState == WelcomeState.chat 
-                ? widget.appContent 
-                : const SizedBox.shrink(),
-          ),
+          // App principale (con animazione slide da sinistra)
+          if (welcomeState == WelcomeState.transitioning || welcomeState == WelcomeState.chat)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              right: welcomeState == WelcomeState.chat ? chatWidth : 0,
+              child: AnimatedBuilder(
+                animation: _appSlideAnimation,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(
+                      _appSlideAnimation.value * MediaQuery.of(context).size.width,
+                      0,
+                    ),
+                    child: widget.appContent,
+                  );
+                },
+              ),
+            ),
           
-          // Welcome Screen / Chat (a destra)
-          AnimatedBuilder(
-            animation: _slideAnimation,
-            builder: (context, child) {
-              return SizedBox(
-                width: MediaQuery.of(context).size.width * _slideAnimation.value,
-                child: welcomeState == WelcomeState.welcome
-                    ? ClaudeStyleWelcome(
-                        onSubmit: _startTransition,
-                      )
-                    : ChatInterface(
-                        onSendMessage: (message) {
-                          final messages = ref.read(chatMessagesProvider);
+          // Chat sidebar (quando attiva)
+          if (welcomeState == WelcomeState.chat)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: AnimatedBuilder(
+                animation: _scaleAnimation,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _scaleAnimation.value,
+                    alignment: Alignment.centerRight,
+                    child: ResizableChat(
+                      width: chatWidth,
+                      onWidthChanged: (newWidth) {
+                        ref.read(chatWidthProvider.notifier).state = newWidth;
+                      },
+                      onSendMessage: (message) {
+                        final messages = ref.read(chatMessagesProvider);
+                        ref.read(chatMessagesProvider.notifier).state = [
+                          ...messages,
+                          ChatMessage(
+                            text: message,
+                            isUser: true,
+                            timestamp: DateTime.now(),
+                          ),
+                        ];
+                        
+                        // Simula risposta del bot
+                        Future.delayed(const Duration(seconds: 1), () {
+                          final currentMessages = ref.read(chatMessagesProvider);
                           ref.read(chatMessagesProvider.notifier).state = [
-                            ...messages,
+                            ...currentMessages,
                             ChatMessage(
-                              text: message,
-                              isUser: true,
+                              text: "Response to: \"$message\"",
+                              isUser: false,
                               timestamp: DateTime.now(),
                             ),
                           ];
-                          
-                          // Simula risposta del bot
-                          Future.delayed(const Duration(seconds: 1), () {
-                            final currentMessages = ref.read(chatMessagesProvider);
-                            ref.read(chatMessagesProvider.notifier).state = [
-                              ...currentMessages,
-                              ChatMessage(
-                                text: "Risposta a: \"$message\"",
-                                isUser: false,
-                                timestamp: DateTime.now(),
-                              ),
-                            ];
-                          });
-                        },
-                      ),
-              );
-            },
-          ),
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          
+          // Welcome screen (con animazioni slide + fade)
+          if (welcomeState != WelcomeState.chat)
+            AnimatedBuilder(
+              animation: Listenable.merge([_slideAnimation, _fadeAnimation]),
+              builder: (context, child) {
+                return SlideTransition(
+                  position: _slideAnimation,
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: ClaudeStyleWelcome(
+                      onSubmit: _startTransition,
+                    ),
+                  ),
+                );
+              },
+            ),
         ],
       ),
     );
   }
 }
 
-// Chat Interface che sostituisce la welcome screen
-class ChatInterface extends ConsumerStatefulWidget {
+// Chat ridimensionabile in stile Claude
+class ResizableChat extends ConsumerStatefulWidget {
+  final double width;
+  final Function(double) onWidthChanged;
   final Function(String) onSendMessage;
   
-  const ChatInterface({
+  const ResizableChat({
     super.key,
+    required this.width,
+    required this.onWidthChanged,
     required this.onSendMessage,
   });
 
   @override
-  ConsumerState<ChatInterface> createState() => _ChatInterfaceState();
+  ConsumerState<ResizableChat> createState() => _ResizableChatState();
 }
 
-class _ChatInterfaceState extends ConsumerState<ChatInterface> {
+class _ResizableChatState extends ConsumerState<ResizableChat> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _isExpanded = false;
+  bool _isDragging = false;
 
   @override
   Widget build(BuildContext context) {
     final messages = ref.watch(chatMessagesProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
     
     return Container(
-      color: AppColors.backgroundLight,
+      width: widget.width,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1F1F), // Sfondo scuro come Claude
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          bottomLeft: Radius.circular(16),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 30,
+            offset: const Offset(-8, 0),
+          ),
+          BoxShadow(
+            color: const Color(0xFF678D7F).withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(-4, 0),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          // Header della chat
+          // Header elegante stile Claude
+          _buildClaudeHeader(screenWidth),
+          
+          // Divisore sottile
           Container(
-            height: 64,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1F1F1F),
-              border: Border(
-                bottom: BorderSide(color: Color(0xFF404040), width: 1),
-                left: BorderSide(color: Color(0xFF404040), width: 1),
-              ),
+            height: 1,
+            color: const Color(0xFF2A2A2A),
+          ),
+          
+          // Lista messaggi con sfondo scuro
+          Expanded(
+            child: Container(
+              color: AppColors.backgroundLight,
+              child: messages.isEmpty 
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final message = messages[index];
+                        return ClaudeChatBubble(message: message);
+                      },
+                    ),
             ),
-            child: const Row(
-              children: [
-                Icon(Icons.chat, color: Color(0xFF678D7F), size: 20),
-                SizedBox(width: 12),
-                Text(
-                  'ARIA',
-                  style: TextStyle(
-                    color: Color(0xFFE5E5E5),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
+          ),
+          
+          // Input area stile Claude
+          _buildClaudeInput(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClaudeHeader(double screenWidth) {
+    return Container(
+      height: 65,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: const BoxDecoration(
+        color: AppColors.backgroundLight,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(16),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Resize handle più elegante
+          MouseRegion(
+            cursor: SystemMouseCursors.resizeLeftRight,
+            child: GestureDetector(
+              onPanStart: (_) => setState(() => _isDragging = true),
+              onPanEnd: (_) => setState(() => _isDragging = false),
+              onPanUpdate: (details) {
+                final newWidth = widget.width - details.delta.dx;
+                if (newWidth >= 280 && newWidth <= screenWidth * 0.7) {
+                  widget.onWidthChanged(newWidth);
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 24,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: _isDragging 
+                      ? const Color(0xFF678D7F).withOpacity(0.3)
+                      : const Color(0xFF2A2A2A),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isDragging 
+                        ? const Color(0xFF678D7F)
+                        : const Color(0xFF404040),
+                    width: 1,
                   ),
                 ),
-              ],
-            ),
-          ),
-          
-          // Lista messaggi
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                final message = messages[index];
-                return ChatBubble(message: message);
-              },
-            ),
-          ),
-          
-          // Input della chat
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              border: Border(
-                top: BorderSide(color: Color(0xFF404040), width: 1),
-                left: BorderSide(color: Color(0xFF404040), width: 1),
+                child: Center(
+                  child: Container(
+                    width: 12,
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: _isDragging 
+                          ? const Color(0xFF678D7F)
+                          : const Color(0xFF888888),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
               ),
+            ),
+          ),
+          
+          const SizedBox(width: 16),
+          
+          // Icona e titolo
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF678D7F),
+                  const Color(0xFF678D7F).withOpacity(0.8),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.balance,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
+          
+          const SizedBox(width: 12),
+          
+          const Text(
+            'ARIA',
+            style: TextStyle(
+              color: Color(0xFF000000),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          
+          const Spacer(),
+          
+          const SizedBox(width: 16),
+          
+          // Pulsanti azione
+          _buildHeaderButton(
+            icon: _isExpanded ? Icons.fullscreen_exit : Icons.fullscreen,
+            onTap: () {
+              setState(() => _isExpanded = !_isExpanded);
+              widget.onWidthChanged(_isExpanded ? 280 : 500);
+            },
+          ),
+          
+          const SizedBox(width: 8),
+          
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderButton({required IconData icon, required VoidCallback onTap}) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.transparent),
+          ),
+          child: Icon(
+            icon,
+            color: const Color(0xFF374151), // Icone grigio scuro
+            size: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6), // Sfondo grigio chiaro
+              borderRadius: BorderRadius.circular(32),
+            ),
+            child: const Icon(
+              Icons.chat_bubble_outline,
+              color: Color(0xFF678D7F),
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Start a conversation',
+            style: TextStyle(
+              color: Color(0xFF111827), // Testo nero
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Ask me anything about your legal case',
+            style: TextStyle(
+              color: Color(0xFF6B7280), // Testo grigio
+              fontSize: 14,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClaudeInput() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Colors.white, // Sfondo bianco per input
+        border: Border(
+          top: BorderSide(color: Color(0xFFE5E7EB), width: 1), // Bordo grigio chiaro
+        ),
+      ),
+      child: Column(
+        children: [
+          // Input container stile Claude
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6), // Sfondo grigio chiaro
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFFE5E7EB), width: 1), // Bordo grigio
             ),
             child: Row(
               children: [
+                // Pulsante attach
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: _buildInputButton(Icons.add, () {}),
+                ),
+                
+                // TextField
                 Expanded(
                   child: TextField(
                     controller: _controller,
-                    style: const TextStyle(color: Color(0xFFE5E5E5)),
+                    style: const TextStyle(
+                      color: Color(0xFF111827), // Testo nero
+                      fontSize: 14,
+                    ),
                     decoration: const InputDecoration(
-                      hintText: 'Write a message...',
-                      hintStyle: TextStyle(color: Color(0xFF888888)),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF404040)),
+                      hintText: 'Message ARIA...',
+                      hintStyle: TextStyle(
+                        color: Color(0xFF6B7280), // Hint grigio
+                        fontSize: 14,
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF404040)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF678D7F)),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
                       ),
                     ),
                     onSubmitted: _sendMessage,
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () => _sendMessage(_controller.text),
-                  icon: const Icon(
-                    Icons.send,
-                    color: Color(0xFF678D7F),
+                
+                // Pulsante send
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: _controller.text.trim().isNotEmpty
+                          ? const Color(0xFF678D7F)
+                          : const Color(0xFF404040),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: IconButton(
+                      onPressed: _controller.text.trim().isNotEmpty
+                          ? () => _sendMessage(_controller.text)
+                          : null,
+                      icon: Icon(
+                        Icons.arrow_upward,
+                        color: _controller.text.trim().isNotEmpty
+                            ? Colors.white
+                            : const Color(0xFF666666),
+                        size: 16,
+                      ),
+                      padding: EdgeInsets.zero,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
+          
+          // Footer info
+          const SizedBox(height: 12),
+          Text(
+            'ARIA can make mistakes. Please verify important information.',
+            style: TextStyle(
+              color: const Color(0xFF6B7280), // Grigio per il disclaimer
+              fontSize: 11,
+            ),
+            textAlign: TextAlign.center,
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInputButton(IconData icon, VoidCallback onTap) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE5E7EB), // Sfondo grigio
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            icon,
+            color: const Color(0xFF6B7280), // Icona grigia
+            size: 16,
+          ),
+        ),
       ),
     );
   }
@@ -273,58 +636,122 @@ class _ChatInterfaceState extends ConsumerState<ChatInterface> {
     
     widget.onSendMessage(text);
     _controller.clear();
+    setState(() {}); // Per aggiornare il pulsante send
     
-    // Scroll verso il basso
+    // Auto scroll
     Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 }
 
-// Bubble per i messaggi della chat
-class ChatBubble extends StatelessWidget {
+// Bubble stile Claude per i messaggi
+class ClaudeChatBubble extends StatelessWidget {
   final ChatMessage message;
   
-  const ChatBubble({
+  const ClaudeChatBubble({
     super.key,
     required this.message,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: message.isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: message.isUser 
-              ? const Color(0xFF678D7F) 
-              : const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.3,
-        ),
-        child: Text(
-          message.text,
-          style: const TextStyle(
-            color: Color(0xFFE5E5E5),
-            fontSize: 14,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: message.isUser 
+                  ? const Color(0xFF404040)
+                  : const Color(0xFF678D7F),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              message.isUser ? Icons.person : Icons.balance,
+              color: Colors.white,
+              size: 14,
+            ),
           ),
-        ),
+          
+          const SizedBox(width: 12),
+          
+          // Contenuto messaggio
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Nome utente
+                Text(
+                  message.isUser ? 'You' : 'ARIA',
+                  style: TextStyle(
+                    color: const Color(0xFFE5E5E5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                
+                const SizedBox(height: 6),
+                
+                // Testo messaggio
+                Container(
+                  padding: const EdgeInsets.all(0),
+                  child: Text(
+                    message.text,
+                    style: TextStyle(
+                      color: const Color(0xFFE5E5E5),
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+                
+                // Timestamp
+                const SizedBox(height: 8),
+                Text(
+                  _formatTime(message.timestamp),
+                  style: TextStyle(
+                    color: const Color(0xFF666666),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  String _formatTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    if (difference.inMinutes < 1) {
+      return 'now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inDays < 1) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
+    }
+  }
 }
 
-// La ClaudeStyleWelcome rimane uguale, ma cambia la signature di onSubmit
+// La ClaudeStyleWelcome rimane uguale
 class ClaudeStyleWelcome extends StatefulWidget {
-  final Function(String) onSubmit; // Ora passa il testo del messaggio
+  final Function(String) onSubmit;
   
   const ClaudeStyleWelcome({
     super.key,
@@ -346,10 +773,7 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
       color: AppColors.backgroundLight,
       child: Column(
         children: [
-          // Top bar scura (stesso codice di prima)
           _buildTopBar(context),
-          
-          // Contenuto principale (stesso codice di prima)
           Expanded(
             child: Center(
               child: Container(
@@ -358,7 +782,6 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Icona e titolo (stesso codice di prima)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -383,9 +806,7 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
                             size: 24,
                           ),
                         ),
-                        
                         const SizedBox(width: 24),
-                        
                         RichText(
                           text: TextSpan(
                             children: [
@@ -414,14 +835,8 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
                         ),
                       ],
                     ),
-                    
                     const SizedBox(height: 60),
-                    
-                    // Input principale (stesso codice di prima)
                     _buildMainInput(context),
-                    
-                    const SizedBox(height: 32),
-                    
                   ],
                 ),
               ),
@@ -432,16 +847,12 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
     );
   }
 
-  // Tutti i metodi _build rimangono uguali...
   Widget _buildTopBar(BuildContext context) {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: const BoxDecoration(
         color: AppColors.backgroundLight,
-        border: Border(
-          bottom: BorderSide(color: AppColors.backgroundLight, width: 1),
-        ),
       ),
       child: Row(
         children: [
@@ -467,7 +878,6 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
             ),
           ),
           const Spacer(),
-          const SizedBox(width: 16),
           Container(
             width: 32,
             height: 32,
@@ -495,7 +905,6 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
     return Container(
       constraints: const BoxConstraints(maxWidth: 800),
       decoration: BoxDecoration(
-        // color: const Color(0xFF2A2A2A),
         color: AppColors.backgroundLight,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: AppColors.primaryGreen, width: 1.5),
@@ -567,84 +976,13 @@ class _ClaudeStyleWelcomeState extends State<ClaudeStyleWelcome> {
     );
   }
 
-  Widget _buildActionButton(IconData icon, String label, VoidCallback onTap, {bool showNew = false}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF404040)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: const Color(0xFFAAAAAA),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFFE5E5E5),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            if (showNew) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF678D7F),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'NUOVO',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
   void _handleSubmit(String text) {
     if (text.trim().isEmpty) return;
     
-    print('Submitted: $text');
     _controller.clear();
-    
-    // Passa il testo del messaggio
     widget.onSubmit(text);
   }
 
-  void _handleAction(String action) {
-    print('Action selected: $action');
-    
-    // Passa l'azione come messaggio
-    widget.onSubmit(action);
-  }
-
-  void _handleAddFile() {
-    print('Add file pressed');
-  }
-
-  void _handleMenu() {
-    print('Menu pressed');
-  }
-
-  void _handleSearch() {
-    print('Search pressed');
-  }
+  void _handleAddFile() => print('Add file pressed');
+  void _handleMenu() => print('Menu pressed');
 }
