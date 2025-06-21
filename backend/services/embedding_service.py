@@ -118,6 +118,7 @@ The response should only be the JSON object, without any additional text or mark
             query_embeddings=[query_embedding],
             n_results=min(top_k, self.collection.count()) 
         )
+        print(results)
         cases_for_gemini = []
         if results and results['metadatas']:
             for i, meta in enumerate(results['metadatas'][0]):
