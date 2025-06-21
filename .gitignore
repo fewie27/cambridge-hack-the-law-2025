@@ -66,4 +66,8 @@ logs/
 node_modules/
 npm-debug.log*
 yarn-debug.log*
-yarn-error.log* 
+yarn-error.log*
+
+backend/database/cases/
+backend/database/chroma_data/
+
