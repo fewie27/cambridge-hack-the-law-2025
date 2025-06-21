@@ -67,16 +67,18 @@ paths:
                 $ref: '#/components/schemas/Error'
 
   /api/v1/gen_draft:
-    post:
+    get:
       summary: Generate a legal draft for a case
       description: Takes a case ID and returns a generated legal draft text
       operationId: genDraft
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GenDraftRequest'
+      parameters:
+        - in: query
+          name: case_id
+          required: true
+          schema:
+            type: string
+          description: The ID of the case to generate a draft for
+          example: "CASE-2024-001"
       responses:
         '200':
           description: Draft generated successfully
@@ -205,6 +207,6 @@ components:
         text:
           type: string
           description: The generated legal draft text
-          example: "DRAFT LEGAL DOCUMENT..."
+          example: "LEGAL DRAFT\n\nIn the matter of..."
       required:
         - text 

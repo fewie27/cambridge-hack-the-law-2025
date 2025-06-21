@@ -35,7 +35,7 @@ class GenDraftRequest {
 
   GenDraftRequest(this.caseId);
 
-  Map<String, dynamic> toJson() => {'case_id': caseId};
+  String toQueryParam() => 'case_id=$caseId';
 }
 
 class GenDraftResponse {
@@ -141,14 +141,15 @@ class CambridgeApi {
   }
 
   static Future<GenDraftResponse> genDraft(GenDraftRequest req) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl/api/v1/gen_draft'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(req.toJson()),
+    final res = await http.get(
+      Uri.parse('$baseUrl/api/v1/gen_draft?${req.toQueryParam()}'),
+      headers: {'accept': 'application/json'},
     );
 
     if (res.statusCode == 200) {
       return GenDraftResponse.fromJson(jsonDecode(res.body));
+    } else if (res.statusCode == 404) {
+      throw Exception('Case not found');
     } else {
       throw Exception('Draft generation failed: ${res.body}');
     }
