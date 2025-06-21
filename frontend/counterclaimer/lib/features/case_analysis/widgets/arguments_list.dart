@@ -13,7 +13,28 @@ class ArgumentsList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final arguments = selectedTab == 0 ? ourStrengths : opponentWeaknesses;
+    final strengths = ref.watch(strengthsProvider);
+    final weaknesses = ref.watch(weaknessesProvider);
+    final arguments = selectedTab == 0 ? strengths : weaknesses;
+    
+    if (arguments.isEmpty) {
+      return Container(
+        color: Colors.white,
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.info_outline, size: 48, color: Colors.grey),
+              SizedBox(height: 16),
+              Text(
+                'No arguments available',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     
     return Container(
       color: Colors.white,

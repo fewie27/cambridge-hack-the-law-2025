@@ -4,7 +4,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-const String baseUrl = 'http://172.25.43.81:8000';
+const String baseUrl = 'http://localhost:8000';
 
 // ------------------------ MODELS ------------------------
 
