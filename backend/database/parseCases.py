@@ -1,19 +1,17 @@
 import os
 import json
+import re
 from uuid import uuid4
 from typing import List
 
-from transformers import AutoTokenizer, AutoModel
-import torch
-import numpy as np
-
+from sentence_transformers import SentenceTransformer
 from chromadb import PersistentClient
 
 # === Configuration ===
 FOLDER_PATH = "cases"
 MAX_TOKENS = 500
 OVERLAP = 100
-MODEL_NAME = "nlpaueb/legal-bert-base-uncased"
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'chroma_data')
 
 # === Initialize Chroma client and collection ===
@@ -25,10 +23,8 @@ if collection_name in [c.name for c in client.list_collections()]:
 else:
     collection = client.create_collection(name=collection_name)
 
-# === Load model and tokenizer ===
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModel.from_pretrained(MODEL_NAME)
-model.eval()
+# === Load SentenceTransformer model ===
+model = SentenceTransformer(MODEL_NAME)
 
 
 # === Utility functions ===
@@ -39,30 +35,13 @@ def chunk_text(text: str, max_tokens: int = MAX_TOKENS, overlap: int = OVERLAP) 
     while i < len(words):
         chunk_words = words[i:i + max_tokens]
         chunk = " ".join(chunk_words)
-
-        token_count = len(tokenizer.tokenize(chunk))
-        while token_count > max_tokens and len(chunk_words) > 10:
-            chunk_words = chunk_words[:-10]
-            chunk = " ".join(chunk_words)
-            token_count = len(tokenizer.tokenize(chunk))
-
         chunks.append(chunk)
         i += max_tokens - overlap
     return chunks
 
 
 def embed_text(text: str) -> List[float]:
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
-    with torch.no_grad():
-        outputs = model(**inputs)
-        last_hidden_state = outputs.last_hidden_state
-        attention_mask = inputs['attention_mask']
-        mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
-        summed = torch.sum(last_hidden_state * mask_expanded, 1)
-        counts = torch.clamp(mask_expanded.sum(1), min=1e-9)
-        mean_pooled = summed / counts
-    embedding = mean_pooled[0].cpu().numpy()
-    embedding = embedding / np.linalg.norm(embedding)
+    embedding = model.encode(text, show_progress_bar=False, normalize_embeddings=True)
     return embedding.tolist()
 
 
@@ -120,14 +99,25 @@ def process_case_file(file_path: str):
 
 
 def process_all_files(folder_path: str):
-    for file in os.listdir(folder_path):
-        if file.endswith(".json"):
-            file_path = os.path.join(folder_path, file)
-            try:
-                process_case_file(file_path)
-                print(f"✅ Processed and inserted {file}")
-            except Exception as e:
-                print(f"❌ Error processing {file}: {e}")
+    def extract_number(filename: str) -> int:
+        match = re.search(r"(\d+)", filename)
+        return int(match.group(1)) if match else float('inf')
+
+    json_files = [
+        f for f in os.listdir(folder_path)
+        if f.endswith(".json")
+    ]
+
+    # Sort files numerically based on the number in the filename
+    sorted_files = sorted(json_files, key=extract_number)
+
+    for file in sorted_files:
+        file_path = os.path.join(folder_path, file)
+        try:
+            process_case_file(file_path)
+            print(f"✅ Processed and inserted {file}")
+        except Exception as e:
+            print(f"❌ Error processing {file}: {e}")
 
 
 # === MAIN ===
