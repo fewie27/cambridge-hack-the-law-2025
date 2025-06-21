@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 # Import generated models
-from models import HealthResponse, Argument, CaseReference, AnalysisResponse, AddCaseRequest, GenDraftRequest, GenDraftResponse
+from models import Argument, CaseReference, AnalysisResponse, AddCaseRequest, GenDraftRequest, GenDraftResponse
 
 # Import embedding service
 from services.embedding_service import EmbeddingService
