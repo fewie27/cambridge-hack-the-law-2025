@@ -5,7 +5,6 @@ import 'package:counterclaimer/core/theme/app_theme.dart';
 import 'package:counterclaimer/features/app_shell.dart';
 import 'package:counterclaimer/simple_api/simple_api.dart';
 import 'package:counterclaimer/features/chatbot/screens/animated_welcome_screen.dart';
-// import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +17,7 @@ void main() async {
   ]);
   
   try {
-    final analysis = await CambridgeApi.addCase(AddCaseRequest("My employer fired me unfairly."));
+    final analysis = await CambridgeApi.addCase(AddCaseRequest("I’m working on a case representing Fenoscadia Limited, a mining company from Ticadia that was operating in Kronos under an 80-year concession to extract lindoro, a rare earth metal. In 2016, Kronos passed a decree that revoked Fenoscadia’s license and terminated the concession agreement, citing environmental concerns. The government had funded a study that suggested lindoro mining contaminated the Rhea River and caused health issues, although the study didn’t conclusively prove this. "));
     print('API Response: $analysis');
   } catch (e) {
     print('Error calling API: $e');
