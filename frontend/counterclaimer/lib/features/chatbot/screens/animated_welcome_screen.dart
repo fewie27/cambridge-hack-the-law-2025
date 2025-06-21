@@ -695,7 +695,7 @@ class ClaudeChatBubble extends StatelessWidget {
                 Text(
                   message.isUser ? 'You' : 'ARIA',
                   style: TextStyle(
-                    color: const Color(0xFFE5E5E5),
+                    color: const Color(0xFF000000),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -709,7 +709,7 @@ class ClaudeChatBubble extends StatelessWidget {
                   child: Text(
                     message.text,
                     style: TextStyle(
-                      color: const Color(0xFFE5E5E5),
+                      color: const Color(0xFF000000),
                       fontSize: 14,
                       height: 1.5,
                     ),
