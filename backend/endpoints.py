@@ -28,42 +28,38 @@ async def add_case(request: AddCaseRequest):
         import uuid
         case_id = f"CASE-{uuid.uuid4().hex[:8].upper()}"
         
-        # Use the embedding service to find similar cases
-        search_results = embedding_service.search_similar_cases(request.user_prompt, top_k=5)
+        # Use the embedding service to find and analyze similar cases
+        structured_analysis = embedding_service.search_similar_cases(request.user_prompt, top_k=5)
         
-        # Process results into AnalysisResponse format
-        strengths = []
-        if search_results and search_results['documents']:
-            # Assume all results are strengths for now
-            arguments = {}
+        def convert_to_arguments(analysis_list):
+            """Converts a list of dicts into a list of Argument Pydantic models."""
+            if not analysis_list:
+                return []
             
-            docs = search_results['documents'][0]
-            metadatas = search_results['metadatas'][0]
-            distances = search_results['distances'][0]
+            output_args = []
+            for item in analysis_list:
+                case_refs = []
+                for ref_data in item.get("case_references", []):
+                    meta = ref_data.get("metadata", {})
+                    full_case_data = meta.get("full_case_data", {})
+                    title = full_case_data.get("name", "Unknown Title")
+                    
+                    case_refs.append(CaseReference(
+                        caseIdentifier=meta.get("case_id", "N/A"),
+                        title=title,
+                        Date=date.fromisoformat(meta["date"]) if meta.get("date") else None,
+                        matchingDegree=1 - ref_data.get("distance", 1.0), # Convert distance to similarity
+                        fileReference=meta.get("file_path", "N/A")
+                    ))
+                
+                output_args.append(Argument(
+                    argument=item.get("argument", "No argument provided."),
+                    case_references=case_refs
+                ))
+            return output_args
 
-            for i in range(len(docs)):
-                doc = docs[i]
-                meta = metadatas[i]
-                distance = distances[i]
-
-                # Create a CaseReference from metadata
-                case_ref = CaseReference(
-                    caseIdentifier=meta.get("case_id", "N/A"),
-                    title=meta.get("title", "Unknown Title"),
-                    Date=date.fromisoformat(meta["date"]) if meta.get("date") else None,
-                    matchingDegree=1 - distance,  # Convert distance to similarity
-                    fileReference=meta.get("file_path", "N/A")
-                )
-
-                # Group by document/argument
-                if doc not in arguments:
-                    arguments[doc] = Argument(argument=doc, case_references=[])
-                arguments[doc].case_references.append(case_ref)
-
-            strengths = list(arguments.values())
-
-        # For now, weaknesses list is empty as we don't have a mechanism to distinguish them
-        weaknesses = []
+        strengths = convert_to_arguments(structured_analysis.get("strengths"))
+        weaknesses = convert_to_arguments(structured_analysis.get("weaknesses"))
         
         return AnalysisResponse(
             caseId=case_id,
