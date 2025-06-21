@@ -11,11 +11,15 @@ from models import Argument, CaseReference, AnalysisResponse, AddCaseRequest, Ge
 # Import embedding service
 from services.embedding_service import EmbeddingService
 
+# Import case storage
+from database.case_storage import CaseStorage
+
 # Create router for API endpoints
 api_router = APIRouter(prefix="/api/v1", tags=["API"])
 
-# Initialize embedding service
+# Initialize services
 embedding_service = EmbeddingService()
+case_storage = CaseStorage()
 
 def sanitize_text(text: str) -> str:
     """
@@ -179,11 +183,16 @@ async def add_case(request: AddCaseRequest):
         strengths = convert_to_arguments(structured_analysis.get("strengths"))
         weaknesses = convert_to_arguments(structured_analysis.get("weaknesses"))
         
-        return AnalysisResponse(
+        response = AnalysisResponse(
             caseId=case_id,
             strengths=strengths,
             weaknesses=weaknesses
         )
+        
+        # Store the response
+        case_storage.store_response(case_id, response.dict())
+        
+        return response
         
     except Exception as e:
         print(f"Error in add_case: {e}")
@@ -192,97 +201,103 @@ async def add_case(request: AddCaseRequest):
 @api_router.get("/gen_draft", response_model=GenDraftResponse)
 async def gen_draft(case_id: str):
     """Generate a legal draft for a case"""
-
-    from datetime import date
-
-    html_template = r"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-    <meta charset="UTF-8">
-    <title>Claim Submissions</title>
-    <style>
-        body {{
-            font-family: "Times New Roman", serif;
-            margin: 40px;
-            line-height: 1.6;
-        }}
-        .center {{
-            text-align: center;
-        }}
-        .underline {{
-            text-decoration: underline;
-        }}
-        .italic {{
-            font-style: italic;
-        }}
-        .bold {{
-            font-weight: bold;
-        }}
-        .section-title {{
-            margin-top: 2em;
-        }}
-        blockquote {{
-            margin-left: 2em;
-            font-style: italic;
-        }}
-    </style>
-    </head>
-    <body>
-
-    <p class="center bold underline">IN THE MATTER OF THE ARBITRATION ACT 1996</p>
-    <p class="center bold underline">AND IN THE MATTER OF AN ARBITRATION</p>
-
-    <p class="center bold">BETWEEN:</p>
-
-    <p class="center bold">{claimants}<br><span class="italic">Claimants</span></p>
-
-    <p class="center bold">-and-</p>
-
-    <p class="center bold">{respondents}<br><span class="italic">Respondents</span></p>
-
-    <p class="center bold italic">{title}</p>
-
-    <hr>
-
-    <p class="center bold">CLAIM SUBMISSIONS</p>
-
-    <hr>
-
-    <h3 class="section-title">The Claimants</h3>
-
-    <p>{intro_statement}</p>
-
-    <h3 class="section-title">The contractual background</h3>
-
-    {body}
-
-    <hr style="margin-top: 3em;">
-
-    <p><strong>Date:</strong> {date}</p>
-    <p><strong>Signature:</strong> _____________________________</p>
-
-    </body>
-    </html>
-    """
-
     try:
         if not case_id:
             raise HTTPException(status_code=400, detail="case_id is required")
-            
-        # TODO: Implement actual draft generation logic
-        # For now, return a dummy response with the case_id included
-        sanitized_case_id = sanitize_text(case_id)
+        
+        # Try to retrieve the case response
+        case_response = case_storage.get_response(case_id)
+        if case_response is None:
+            raise HTTPException(status_code=404, detail=f"Case with ID {case_id} not found")
+        
+        # Convert the stored response back to an AnalysisResponse model
+        analysis = AnalysisResponse(**case_response)
+
+        from datetime import date
+
+        html_template = r"""
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+        <meta charset="UTF-8">
+        <title>Claim Submissions</title>
+        <style>
+            body {{
+                font-family: "Times New Roman", serif;
+                margin: 40px;
+                line-height: 1.6;
+            }}
+            .center {{
+                text-align: center;
+            }}
+            .underline {{
+                text-decoration: underline;
+            }}
+            .italic {{
+                font-style: italic;
+            }}
+            .bold {{
+                font-weight: bold;
+            }}
+            .section-title {{
+                margin-top: 2em;
+            }}
+            blockquote {{
+                margin-left: 2em;
+                font-style: italic;
+            }}
+        </style>
+        </head>
+        <body>
+
+        <p class="center bold underline">IN THE MATTER OF THE ARBITRATION ACT 1996</p>
+        <p class="center bold underline">AND IN THE MATTER OF AN ARBITRATION</p>
+
+        <p class="center bold">BETWEEN:</p>
+
+        <p class="center bold">{claimants}<br><span class="italic">Claimants</span></p>
+
+        <p class="center bold">-and-</p>
+
+        <p class="center bold">{respondents}<br><span class="italic">Respondents</span></p>
+
+        <p class="center bold italic">{title}</p>
+
+        <hr>
+
+        <p class="center bold">CLAIM SUBMISSIONS</p>
+
+        <hr>
+
+        <h3 class="section-title">The Claimants</h3>
+
+        <p>{intro_statement}</p>
+
+        <h3 class="section-title">The contractual background</h3>
+
+        {body}
+
+        <hr style="margin-top: 3em;">
+
+        <p><strong>Date:</strong> {date}</p>
+        <p><strong>Signature:</strong> _____________________________</p>
+
+        </body>
+        </html>
+        """
+
         return GenDraftResponse(
-            text=sanitize_text(html_template.format(
-                claimants=f"Claimants (Case: {sanitized_case_id})",
+            text=html_template.format(
+                claimants=f"Claimants (Case: {case_id})",
                 respondents="Respondents",
                 title="Title",
                 intro_statement="Intro Statement",
                 body="Body",
                 date=date.today().strftime("%d %B %Y")
-            ))
+            )
         )
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in gen_draft: {e}")
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}") 
