@@ -41,17 +41,25 @@ async def add_case(request: AddCaseRequest):
                 case_refs = []
                 for ref_data in item.get("case_references", []):
                     meta = ref_data.get("metadata", {})
-                    full_case_data = meta.get("full_case_data", {})
-                    title = full_case_data.get("name", "Unknown Title")
-                    
+                    # Use ChromaDB metadata fields
+                    case_identifier = meta.get("Identifier") or meta.get("case_id") or meta.get("source_file") or "N/A"
+                    title = meta.get("Title") or meta.get("title") or meta.get("source_file") or "Unknown Title"
+                    decision_date = meta.get("DecisionDate") or meta.get("date")
+                    file_reference = meta.get("source_file") or meta.get("file_path") or "N/A"
+                    # Parse date if present
+                    parsed_date = None
+                    if decision_date:
+                        try:
+                            parsed_date = date.fromisoformat(decision_date[:10])
+                        except Exception:
+                            parsed_date = None
                     case_refs.append(CaseReference(
-                        caseIdentifier=meta.get("case_id", "N/A"),
+                        caseIdentifier=case_identifier,
                         title=title,
-                        Date=date.fromisoformat(meta["date"]) if meta.get("date") else None,
-                        matchingDegree=1 - ref_data.get("distance", 1.0), # Convert distance to similarity
-                        fileReference=meta.get("file_path", "N/A")
+                        Date=parsed_date,
+                        matchingDegree=1 - ref_data.get("distance", 1.0),
+                        fileReference=file_reference
                     ))
-                
                 output_args.append(Argument(
                     argument=item.get("argument", "No argument provided."),
                     case_references=case_refs
