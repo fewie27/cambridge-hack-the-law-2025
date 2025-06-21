@@ -5,6 +5,7 @@ import '../widgets/tab_navigation.dart';
 import '../widgets/arguments_list.dart';
 import '../widgets/argument_detail.dart';
 import '../../../simple_api/simple_api.dart';
+import '../providers/case_providers.dart';
 
 // Models
 class LegalArgument {
@@ -59,6 +60,10 @@ final analysisDataProvider = FutureProvider<AnalysisResponse?>((ref) async {
     print('API Response received: ${response.caseId}');
     print('Strengths: ${response.strengths.length}');
     print('Weaknesses: ${response.weaknesses.length}');
+    
+    // Set the current case ID when we receive the response
+    ref.read(currentCaseIdProvider.notifier).state = response.caseId;
+    
     return response;
   } catch (e) {
     print('Error fetching analysis data: $e');

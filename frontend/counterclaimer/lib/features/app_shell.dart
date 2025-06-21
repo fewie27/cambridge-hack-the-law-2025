@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:io' show Platform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:counterclaimer/features/case_analysis/screens/legal_arguments_screen.dart';
+import 'package:counterclaimer/features/document_view/screens/document_view_screen.dart';
 // import 'package:bmw_legal_assistant/features/document_review/screens/document_review_screen.dart';
 import 'package:counterclaimer/core/theme/colors.dart';
 
@@ -50,8 +51,7 @@ class AppShell extends ConsumerWidget {
                       index: selectedTabIndex,
                       children: const [
                         LegalArgumentsScreen(),
-                        // DocumentReviewScreen(),
-                        Placeholder(color: AppColors.lightGreen),
+                        DocumentViewScreen(),
                         Placeholder(color: AppColors.lightGreen),
                       ],
                     )
@@ -67,8 +67,7 @@ class AppShell extends ConsumerWidget {
                             index: selectedTabIndex,
                             children: const [
                               LegalArgumentsScreen(),
-                              // DocumentReviewScreen(),
-                              Placeholder(color: AppColors.lightGreen),
+                              DocumentViewScreen(),
                               Placeholder(color: AppColors.lightGreen),
                             ],
                           ),
