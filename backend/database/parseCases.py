@@ -16,6 +16,10 @@ OVERLAP = 100
 MODEL_NAME = "nlpaueb/legal-bert-base-uncased"
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'chroma_data')
 
+# === Detect GPU ===
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 # === Initialize Chroma client and collection ===
 client = PersistentClient(path=DATA_DIR)
 collection_name = "legal_cases"
@@ -27,9 +31,8 @@ else:
 
 # === Load model and tokenizer ===
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModel.from_pretrained(MODEL_NAME)
+model = AutoModel.from_pretrained(MODEL_NAME).to(device)  # Move model to GPU if available
 model.eval()
-
 
 # === Utility functions ===
 def chunk_text(text: str, max_tokens: int = MAX_TOKENS, overlap: int = OVERLAP) -> List[str]:
@@ -50,9 +53,8 @@ def chunk_text(text: str, max_tokens: int = MAX_TOKENS, overlap: int = OVERLAP) 
         i += max_tokens - overlap
     return chunks
 
-
 def embed_text(text: str) -> List[float]:
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512)
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(device)
     with torch.no_grad():
         outputs = model(**inputs)
         last_hidden_state = outputs.last_hidden_state
@@ -65,12 +67,10 @@ def embed_text(text: str) -> List[float]:
     embedding = embedding / np.linalg.norm(embedding)
     return embedding.tolist()
 
-
 def normalize_metadata(value):
     if isinstance(value, list):
         return ", ".join(map(str, value))
     return value
-
 
 # === Core file processing ===
 def process_case_file(file_path: str):
@@ -118,7 +118,6 @@ def process_case_file(file_path: str):
                 ids=[str(uuid4())]
             )
 
-
 def process_all_files(folder_path: str):
     for file in os.listdir(folder_path):
         if file.endswith(".json"):
@@ -128,7 +127,6 @@ def process_all_files(folder_path: str):
                 print(f"✅ Processed and inserted {file}")
             except Exception as e:
                 print(f"❌ Error processing {file}: {e}")
-
 
 # === MAIN ===
 if __name__ == "__main__":
