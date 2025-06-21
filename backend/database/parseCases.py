@@ -13,6 +13,7 @@ from chromadb import PersistentClient
 FOLDER_PATH = "cases"
 MAX_TOKENS = 500
 OVERLAP = 100
+BATCH_SIZE = 128
 MODEL_NAME = "nlpaueb/legal-bert-base-uncased"
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'chroma_data')
 
@@ -20,7 +21,6 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), 'chroma_data')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# === Initialize Chroma client and collection ===
 client = PersistentClient(path=DATA_DIR)
 collection_name = "legal_cases"
 
@@ -31,48 +31,49 @@ else:
 
 # === Load model and tokenizer ===
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModel.from_pretrained(MODEL_NAME).to(device)  # Move model to GPU if available
+model = AutoModel.from_pretrained(MODEL_NAME).to(device)
 model.eval()
 
 # === Utility functions ===
 def chunk_text(text: str, max_tokens: int = MAX_TOKENS, overlap: int = OVERLAP) -> List[str]:
-    words = text.split()
+    # Tokenize once for entire text
+    encoded = tokenizer.encode(text, add_special_tokens=False)
     chunks = []
-    i = 0
-    while i < len(words):
-        chunk_words = words[i:i + max_tokens]
-        chunk = " ".join(chunk_words)
+    start = 0
+    length = len(encoded)
 
-        token_count = len(tokenizer.tokenize(chunk))
-        while token_count > max_tokens and len(chunk_words) > 10:
-            chunk_words = chunk_words[:-10]
-            chunk = " ".join(chunk_words)
-            token_count = len(tokenizer.tokenize(chunk))
+    while start < length:
+        end = min(start + max_tokens, length)
+        chunk_ids = encoded[start:end]
+        chunk_text = tokenizer.decode(chunk_ids, clean_up_tokenization_spaces=True)
+        chunks.append(chunk_text)
+        start += max_tokens - overlap
 
-        chunks.append(chunk)
-        i += max_tokens - overlap
     return chunks
 
-def embed_text(text: str) -> List[float]:
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(device)
+from torch.cuda.amp import autocast
+
+def embed_texts(texts: List[str]) -> List[List[float]]:
+    inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt", max_length=512).to(device)
     with torch.no_grad():
-        outputs = model(**inputs)
-        last_hidden_state = outputs.last_hidden_state
-        attention_mask = inputs['attention_mask']
-        mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
-        summed = torch.sum(last_hidden_state * mask_expanded, 1)
-        counts = torch.clamp(mask_expanded.sum(1), min=1e-9)
-        mean_pooled = summed / counts
-    embedding = mean_pooled[0].cpu().numpy()
-    embedding = embedding / np.linalg.norm(embedding)
-    return embedding.tolist()
+        with autocast():
+            outputs = model(**inputs)
+            last_hidden_state = outputs.last_hidden_state
+            attention_mask = inputs['attention_mask']
+            mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+            summed = torch.sum(last_hidden_state * mask_expanded, 1)
+            counts = torch.clamp(mask_expanded.sum(1), min=1e-9)
+            mean_pooled = summed / counts
+            normalized = mean_pooled / mean_pooled.norm(dim=1, keepdim=True)
+    embeddings = normalized.cpu().numpy()
+    return embeddings.tolist()
 
 def normalize_metadata(value):
     if isinstance(value, list):
         return ", ".join(map(str, value))
     return value
 
-# === Core file processing ===
+# === Core file processing with batching ===
 def process_case_file(file_path: str):
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -101,8 +102,9 @@ def process_case_file(file_path: str):
         }
 
         chunks = chunk_text(content)
+        batch_texts, batch_metadatas, batch_ids = [], [], []
+
         for i, chunk in enumerate(chunks):
-            embedding = embed_text(chunk)
             metadata = {
                 **case_metadata,
                 **decision_metadata,
@@ -111,12 +113,19 @@ def process_case_file(file_path: str):
                 "source_file": os.path.basename(file_path)
             }
 
-            collection.add(
-                documents=[chunk],
-                embeddings=[embedding],
-                metadatas=[metadata],
-                ids=[str(uuid4())]
-            )
+            batch_texts.append(chunk)
+            batch_metadatas.append(metadata)
+            batch_ids.append(str(uuid4()))
+
+            if len(batch_texts) >= BATCH_SIZE or i == len(chunks) - 1:
+                batch_embeddings = embed_texts(batch_texts)
+                collection.add(
+                    documents=batch_texts,
+                    embeddings=batch_embeddings,
+                    metadatas=batch_metadatas,
+                    ids=batch_ids
+                )
+                batch_texts, batch_metadatas, batch_ids = [], [], []
 
 def process_all_files(folder_path: str):
     for file in os.listdir(folder_path):
