@@ -103,10 +103,34 @@ async def add_case(request: AddCaseRequest):
                 case_refs = []
                 for ref_data in item.get("case_references", []):
                     meta = ref_data.get("metadata", {})
+                    full_case_data = meta.get("full_case_data", {})
+                    
+                    # Extract basic metadata
                     case_identifier = sanitize_text(meta.get("Identifier") or meta.get("case_id") or meta.get("source_file") or "N/A")
                     title = sanitize_text(meta.get("Title") or meta.get("title") or meta.get("source_file") or "Unknown Title")
                     decision_date = meta.get("DecisionDate") or meta.get("date")
                     sourcefile_raw_md = sanitize_text(meta.get("source_file") or meta.get("file_path") or "N/A")
+                    
+                    # Extract additional case details from full_case_data
+                    case_number = sanitize_text(full_case_data.get("CaseNumber") or meta.get("CaseNumber") or "N/A")
+                    industries = full_case_data.get("Industries") or []
+                    status = sanitize_text(full_case_data.get("Status") or meta.get("Status") or "N/A")
+                    party_nationalities = full_case_data.get("PartyNationalities") or []
+                    institution = sanitize_text(full_case_data.get("Institution") or meta.get("Institution") or "N/A")
+                    rules_of_arbitration = full_case_data.get("RulesOfArbitration") or []
+                    applicable_treaties = full_case_data.get("ApplicableTreaties") or []
+                    decisions = full_case_data.get("Decisions") or []
+                    
+                    # Sanitize lists
+                    if isinstance(industries, list):
+                        industries = [sanitize_text(str(item)) for item in industries if item]
+                    if isinstance(party_nationalities, list):
+                        party_nationalities = [sanitize_text(str(item)) for item in party_nationalities if item]
+                    if isinstance(rules_of_arbitration, list):
+                        rules_of_arbitration = [sanitize_text(str(item)) for item in rules_of_arbitration if item]
+                    if isinstance(applicable_treaties, list):
+                        applicable_treaties = [sanitize_text(str(item)) for item in applicable_treaties if item]
+                    
                     parsed_date = None
                     if decision_date:
                         try:
@@ -115,12 +139,22 @@ async def add_case(request: AddCaseRequest):
                             parsed_date = date.fromisoformat(clean_date[:10])
                         except Exception:
                             parsed_date = None
+                    
                     case_refs.append(CaseReference(
                         caseIdentifier=case_identifier,
                         title=title,
                         Date=parsed_date,
                         matchingDegree=1 - ref_data.get("distance", 1.0),
-                        sourcefile_raw_md=sourcefile_raw_md
+                        sourcefile_raw_md=sourcefile_raw_md,
+                        # Additional case details
+                        caseNumber=case_number,
+                        industries=industries,
+                        status=status,
+                        partyNationalities=party_nationalities,
+                        institution=institution,
+                        rulesOfArbitration=rules_of_arbitration,
+                        applicableTreaties=applicable_treaties,
+                        decisions=decisions
                     ))
                 output_args.append(Argument(
                     argument=sanitize_text(item.get("argument", "No argument provided.")),

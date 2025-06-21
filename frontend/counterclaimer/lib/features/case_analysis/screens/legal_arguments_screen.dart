@@ -32,6 +32,14 @@ class PrecedentCase {
   final String year;
   final String relevantHolding;
   final String citation;
+  // Additional case details
+  final List<String> industries;
+  final String status;
+  final List<String> partyNationalities;
+  final String institution;
+  final List<String> rulesOfArbitration;
+  final List<String> applicableTreaties;
+  final List<Map<String, dynamic>> decisions;
 
   PrecedentCase({
     required this.caseNumber,
@@ -40,6 +48,13 @@ class PrecedentCase {
     required this.year,
     required this.relevantHolding,
     required this.citation,
+    this.industries = const [],
+    this.status = '',
+    this.partyNationalities = const [],
+    this.institution = '',
+    this.rulesOfArbitration = const [],
+    this.applicableTreaties = const [],
+    this.decisions = const [],
   });
 }
 
@@ -93,6 +108,13 @@ final strengthsProvider = Provider<List<LegalArgument>>((ref) {
               year: ref.date ?? 'N/A',
               relevantHolding: 'Relevant holding based on case analysis',
               citation: ref.sourcefileRawMd.isNotEmpty ? ref.sourcefileRawMd : 'N/A',
+              industries: ref.industries,
+              status: ref.status ?? '',
+              partyNationalities: ref.partyNationalities,
+              institution: ref.institution ?? '',
+              rulesOfArbitration: ref.rulesOfArbitration,
+              applicableTreaties: ref.applicableTreaties,
+              decisions: ref.decisions,
             );
           }).toList(),
         );
@@ -130,6 +152,13 @@ final weaknessesProvider = Provider<List<LegalArgument>>((ref) {
               year: ref.date ?? 'N/A',
               relevantHolding: 'Relevant holding based on case analysis',
               citation: ref.sourcefileRawMd.isNotEmpty ? ref.sourcefileRawMd : 'N/A',
+              industries: ref.industries,
+              status: ref.status ?? '',
+              partyNationalities: ref.partyNationalities,
+              institution: ref.institution ?? '',
+              rulesOfArbitration: ref.rulesOfArbitration,
+              applicableTreaties: ref.applicableTreaties,
+              decisions: ref.decisions,
             );
           }).toList(),
         );
