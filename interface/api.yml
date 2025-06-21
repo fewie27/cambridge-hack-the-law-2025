@@ -160,10 +160,10 @@ components:
           minimum: 0.0
           maximum: 1.0
           example: 0.85
-        fileReference:
+        sourcefile_raw_md:
           type: string
-          description: Reference to the case file
-          example: "doc_12345.pdf"
+          description: Raw markdown content of the source file
+          example: "# Case Summary\n\nThis case involves..."
     
     HealthResponse:
       type: object
